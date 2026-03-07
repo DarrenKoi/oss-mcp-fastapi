@@ -23,20 +23,20 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker
 
 ## Architecture
 
-- **Entrypoint**: `app/main.py` — creates the FastAPI app and auto-discovers every `router.py` module under `app/`
-- **Service packages live under `app/`** — each package owns a `router.py` that assembles versioned routers for that service or sub-service
+- **Entrypoint**: `app/main.py` — creates the FastAPI app and auto-discovers every `router*` module under `app/`
+- **Service packages live under `app/`** — each package can expose `router.py` for unversioned routes and `router_v1.py`, `router_v2.py`, and similar modules for versioned routes
 
 ### Module pattern (two-class design)
 
 Each module follows a server + client pattern:
 - `*_server.py` — runs inside the FastAPI server, does the actual work (e.g., connects to FTP)
 - `*_client.py` — Python SDK distributed to office users' local PCs, wraps HTTP calls to the server API via `httpx`
-- `router.py` — package-level router that owns the service prefix and includes version modules like `v1.py`
-- `v1.py`, `v2.py` — version-specific FastAPI endpoints that instantiate the server class
+- `router.py` — optional unversioned FastAPI endpoints for a package
+- `router_v1.py`, `router_v2.py` — version-specific FastAPI endpoints that instantiate the server class and own their full URL prefixes
 
 ### API versioning
 
-API versioning uses suffix-style paths owned by each service package. For example, a service router may expose `/oss/mtc/v1/...` and later add `/oss/mtc/v2/...` by including multiple version modules from the same `router.py`.
+API versioning uses suffix-style paths owned directly by each versioned router module. For example, a service package may expose `/oss/mtc/v1/...` from `router_v1.py` and later add `/oss/mtc/v2/...` from `router_v2.py`.
 
 ## Journals
 

@@ -6,15 +6,19 @@ from fastapi import APIRouter, FastAPI
 import app as app_package
 
 
+def is_router_module(module_name: str) -> bool:
+    return module_name.rsplit(".", maxsplit=1)[-1].startswith("router")
+
+
 def discover_routers() -> list[APIRouter]:
     routers: list[APIRouter] = []
 
-    # Load every app.*.router module so new service packages are mounted automatically.
+    # Load every app.*.router* module so versioned routers can live in dedicated files.
     for module_info in sorted(
         walk_packages(app_package.__path__, prefix=f"{app_package.__name__}."),
         key=lambda item: item.name,
     ):
-        if not module_info.name.endswith(".router"):
+        if not is_router_module(module_info.name):
             continue
 
         module = import_module(module_info.name)

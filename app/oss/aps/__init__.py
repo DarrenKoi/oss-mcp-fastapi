@@ -1,3 +1,1 @@
-from app.oss.aps.router import router
-
-__all__ = ["router"]
+"""OSS APS service package."""

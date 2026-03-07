@@ -1,8 +1,8 @@
 # Project Memory
 
 ## Routing Architecture
-- `app/main.py` auto-discovers every `router.py` module under `app/` and mounts it directly.
-- Package-level `router.py` files own the service prefix and aggregate version modules such as `v1.py` and `v2.py`.
+- `app/main.py` auto-discovers every module whose filename starts with `router` under `app/` and mounts it directly.
+- Versioned endpoints live in files such as `router_v1.py` and `router_v2.py`, and each router module owns its full path prefix.
 - API versioning uses suffix-style URLs such as `/oss/mtc/v1/...` and `/ftp-proxy/v1/...`.
 
 ## Service Layout

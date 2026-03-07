@@ -1,3 +1,1 @@
-from app.skewnono.router import router
-
-__all__ = ["router"]
+"""SKEWNONO service package."""

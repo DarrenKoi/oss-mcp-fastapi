@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/v1", tags=["MCP"])
+router = APIRouter(prefix="/mcp/v1", tags=["MCP"])
 
 
 @router.get("/health")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/v1", tags=["OSS MTC"])
+router = APIRouter(prefix="/oss/mtc/v1", tags=["OSS MTC"])
 
 
 @router.get("/health")

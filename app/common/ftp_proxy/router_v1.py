@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 
-router = APIRouter(prefix="/v1", tags=["FTP Proxy"])
+router = APIRouter(prefix="/ftp-proxy/v1", tags=["FTP Proxy"])
 
 
 @router.get("/list")
