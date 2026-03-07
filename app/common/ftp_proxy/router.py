@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Query, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.common.ftp_proxy.ftp_client import ftp_connection, list_dir, download_stream, upload_file
+from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 
 router = APIRouter(prefix="/ftp-proxy", tags=["FTP Proxy"])
 
@@ -17,8 +17,8 @@ def ftp_list(
     path: str = Query("/"),
 ):
     try:
-        with ftp_connection(host, port, user, password) as ftp:
-            entries = list_dir(ftp, path)
+        server = FTPProxyServer(host, port, user, password)
+        entries = server.list_dir(path)
         return {"path": path, "entries": entries}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
@@ -33,13 +33,10 @@ def ftp_download(
     path: str = Query(...),
 ):
     filename = os.path.basename(path)
-
-    def stream():
-        with ftp_connection(host, port, user, password) as ftp:
-            yield from download_stream(ftp, path)
+    server = FTPProxyServer(host, port, user, password)
 
     return StreamingResponse(
-        stream(),
+        server.download_stream(path),
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
@@ -54,11 +51,9 @@ def ftp_upload(
     path: str = Query(..., description="Remote directory path to upload to"),
     file: UploadFile = File(...),
 ):
-    remote_path = f"{path.rstrip('/')}/{file.filename}"
     try:
-        with ftp_connection(host, port, user, password) as ftp:
-            ftp.cwd(path)
-            upload_file(ftp, remote_path, file.file)
+        server = FTPProxyServer(host, port, user, password)
+        remote_path = server.upload(path, file.filename, file.file)
         return {"status": "uploaded", "remote_path": remote_path}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
