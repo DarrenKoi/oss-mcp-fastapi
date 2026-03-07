@@ -39,5 +39,7 @@ There is no automated test suite yet. Until one is added, verify changes manuall
 ## Commit & Pull Request Guidelines
 Recent commits use short, imperative summaries such as `Initial project setup with FTP proxy module` and `Refactor FTP proxy into server class and client SDK`. Keep commit messages focused on one change. Pull requests should include a brief purpose statement, impacted routes or modules, manual test notes, and sample requests or screenshots when API behavior changes.
 
+When code is created or modified by the agent, commit and push automatically only after a relevant verification step succeeds. Use the smallest reasonable verification for the change, such as a passing test run, a successful app startup check, or a validated endpoint response. If verification is blocked or fails, stop before pushing and report the reason.
+
 ## Security & Configuration Tips
 Do not commit `.env`, FTP credentials, or office hostnames. Prefer environment variables for local overrides such as `HOST`, `PORT`, `RELOAD`, and `LOG_LEVEL`. Treat FTP access as sensitive and avoid logging passwords or remote file contents.

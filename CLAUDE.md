@@ -40,3 +40,7 @@ All API routes are prefixed with `/v1` at the `include_router()` level in `main.
 ## Journals
 
 Development journals are kept in `doc/journals/` in Korean. Use the `/journal` skill to generate session journals.
+
+## Commit Automation Policy
+
+When code is generated or edited in this repository, commit and push automatically only after a relevant verification step succeeds. Acceptable verification includes passing tests, a successful local startup check, or another concrete validation that matches the change. If verification cannot be run or fails, do not auto-push; report the blocker instead.
