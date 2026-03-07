@@ -8,13 +8,14 @@ Use this file to remember non-sensitive office testing constraints for this repo
 - Home development should not depend on local Redis, MongoDB, or OpenSearch instances.
 - New or edited code should be verified at home with mocking data first.
 - Office testing happens on Windows.
+- Office Python version is 3.11.
 - Office testing may use Redis, MongoDB, and OpenSearch.
 - Production runs on Linux.
 - Integration tests must avoid hardcoded secrets or hostnames in source control.
 
 ## Assumptions To Confirm
 
-- Office Python version and virtual environment workflow.
+- Office virtual environment workflow.
 - Whether office tests run from PowerShell, `cmd.exe`, Git Bash, or WSL.
 - How office service endpoints are supplied: environment variables, `.env`, VPN, or another mechanism.
 - Whether Docker is available at the office for optional local dependencies.
