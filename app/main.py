@@ -28,7 +28,7 @@ def discover_routers() -> list[APIRouter]:
 app = FastAPI(title="Internal MCP FastAPI Server")
 
 for router in discover_routers():
-    app.include_router(router, prefix="/v1")
+    app.include_router(router)
 
 
 @app.get("/health")

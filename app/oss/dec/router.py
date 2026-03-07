@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 
+from app.oss.dec.v1 import router as v1_router
+
 router = APIRouter(prefix="/oss/dec", tags=["OSS DEC"])
 
-
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"service": "oss", "module": "dec", "status": "ok"}
+router.include_router(v1_router)

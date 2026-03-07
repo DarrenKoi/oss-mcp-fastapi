@@ -23,19 +23,20 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker
 
 ## Architecture
 
-- **Entrypoint**: `app/main.py` — creates the FastAPI app, registers all routers with `/v1` prefix
-- **Modules live under `app/common/`** — each module has its own subdirectory with a `router.py` for API endpoints
+- **Entrypoint**: `app/main.py` — creates the FastAPI app and auto-discovers every `router.py` module under `app/`
+- **Service packages live under `app/`** — each package owns a `router.py` that assembles versioned routers for that service or sub-service
 
 ### Module pattern (two-class design)
 
 Each module follows a server + client pattern:
 - `*_server.py` — runs inside the FastAPI server, does the actual work (e.g., connects to FTP)
 - `*_client.py` — Python SDK distributed to office users' local PCs, wraps HTTP calls to the server API via `httpx`
-- `router.py` — FastAPI endpoints that instantiate the server class
+- `router.py` — package-level router that owns the service prefix and includes version modules like `v1.py`
+- `v1.py`, `v2.py` — version-specific FastAPI endpoints that instantiate the server class
 
 ### API versioning
 
-All API routes are prefixed with `/v1` at the `include_router()` level in `main.py`. Individual routers define their own sub-prefix (e.g., `/ftp-proxy`), resulting in paths like `/v1/ftp-proxy/list`.
+API versioning uses suffix-style paths owned by each service package. For example, a service router may expose `/oss/mtc/v1/...` and later add `/oss/mtc/v2/...` by including multiple version modules from the same `router.py`.
 
 ## Journals
 

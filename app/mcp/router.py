@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 
+from app.mcp.v1 import router as v1_router
+
 router = APIRouter(prefix="/mcp", tags=["MCP"])
 
-
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"service": "mcp", "status": "ok"}
+router.include_router(v1_router)
