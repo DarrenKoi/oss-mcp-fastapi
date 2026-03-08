@@ -1,7 +1,9 @@
+from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from app.main import app, discover_routers, is_router_module
+from app.main import app, discover_router_module_names, discover_routers, is_router_module
+from test_support.manual_router_case import sample_app
 
 
 def test_is_router_module_accepts_router_prefix() -> None:
@@ -23,6 +25,40 @@ def test_discover_routers_loads_versioned_router_modules() -> None:
         "/oss/v1",
         "/skewnono/v1",
     }
+
+
+def test_discover_router_module_names_supports_manual_modules() -> None:
+    module_names = discover_router_module_names(
+        package_paths=sample_app.__path__,
+        package_name=sample_app.__name__,
+        manual_router_modules=(
+            "test_support.manual_router_case.sample_app.custom_manual_routes",
+        ),
+    )
+
+    assert module_names == [
+        "test_support.manual_router_case.sample_app.custom_manual_routes",
+        "test_support.manual_router_case.sample_app.router_alpha",
+    ]
+
+
+def test_discover_routers_merges_auto_and_manual_modules() -> None:
+    routers = discover_routers(
+        package_paths=sample_app.__path__,
+        package_name=sample_app.__name__,
+        manual_router_modules=(
+            "test_support.manual_router_case.sample_app.custom_manual_routes",
+        ),
+    )
+
+    test_app = FastAPI()
+    for router in routers:
+        test_app.include_router(router)
+
+    client = TestClient(test_app)
+
+    assert client.get("/sample/auto").json() == {"mode": "auto"}
+    assert client.get("/sample/manual").json() == {"mode": "manual"}
 
 
 def test_app_exposes_health_and_versioned_routes() -> None:

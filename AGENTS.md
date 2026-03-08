@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`app/` contains the FastAPI application. The entrypoint is `app/main.py`, which auto-discovers every module whose filename starts with `router` under `app/` and mounts its exported `router` directly. Use `router.py` for unversioned routes and `router_v1.py`, `router_v2.py`, and similar files for versioned endpoints, with each router owning its full prefix such as `/oss/mtc/v1`. Shared FTP logic lives in `app/common/ftp_proxy/`, split between the API router, server-side FTP adapter, and a small client SDK. `run.py` is the local development launcher. `requirements.txt` pins the runtime dependencies. `doc/journals/` stores session notes and should not contain source code.
+`app/` contains the FastAPI application. The entrypoint is `app/main.py`, which auto-discovers every module whose filename starts with `router` under `app/` and mounts its exported `router` directly. Use `router.py` for unversioned routes and `router_v1.py`, `router_v2.py`, and similar files for versioned endpoints, with each router owning its full prefix such as `/oss/mtc/v1`. When a router file cannot follow the naming rule, register its dotted module path in `MANUAL_ROUTER_MODULES` inside `app/main.py`. Shared FTP logic lives in `app/common/ftp_proxy/`, split between the API router, server-side FTP adapter, and a small client SDK. `run.py` is the local development launcher. `requirements.txt` pins the runtime dependencies. `doc/journals/` stores session notes and should not contain source code.
 
 ## Build, Test, and Development Commands
 Create and activate a local environment before working:
@@ -31,7 +31,7 @@ uvicorn app.main:app --reload
 ```
 
 ## Coding Style & Naming Conventions
-Use Python 3 with 4-space indentation and type hints for public functions. Follow PEP 8 naming: `snake_case` for modules, functions, and variables; `PascalCase` for classes. Keep routers thin and put FTP or transport logic into dedicated service classes such as `FTPProxyServer`. Name route modules with a `router` prefix so discovery can load them automatically, and let each router module declare the full path prefix it serves. Prefer small, explicit functions over shared magic configuration.
+Use Python 3 with 4-space indentation and type hints for public functions. Follow PEP 8 naming: `snake_case` for modules, functions, and variables; `PascalCase` for classes. Keep routers thin and put FTP or transport logic into dedicated service classes such as `FTPProxyServer`. Name route modules with a `router` prefix so discovery can load them automatically, and let each router module declare the full path prefix it serves. Only use `MANUAL_ROUTER_MODULES` when a router cannot follow the naming rule. Prefer small, explicit functions over shared magic configuration.
 
 ## Testing Guidelines
 There is no automated test suite yet. Until one is added, verify changes manually by starting the app and checking endpoints such as `GET /health` and versioned routes like `/ftp-proxy/v1/*`, `/oss/v1/*`, or `/oss/mtc/v1/*`. When adding tests, use `pytest`, place them under `tests/`, and name files `test_<feature>.py`.

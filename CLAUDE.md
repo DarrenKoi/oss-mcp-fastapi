@@ -23,7 +23,7 @@ gunicorn app.main:app -k uvicorn.workers.UvicornWorker
 
 ## Architecture
 
-- **Entrypoint**: `app/main.py` — creates the FastAPI app and auto-discovers every `router*` module under `app/`
+- **Entrypoint**: `app/main.py` — creates the FastAPI app, auto-discovers every `router*` module under `app/`, and can also include explicitly listed modules from `MANUAL_ROUTER_MODULES`
 - **Service packages live under `app/`** — each package can expose `router.py` for unversioned routes and `router_v1.py`, `router_v2.py`, and similar modules for versioned routes
 
 ### Module pattern (two-class design)
@@ -33,6 +33,7 @@ Each module follows a server + client pattern:
 - `*_client.py` — Python SDK distributed to office users' local PCs, wraps HTTP calls to the server API via `httpx`
 - `router.py` — optional unversioned FastAPI endpoints for a package
 - `router_v1.py`, `router_v2.py` — version-specific FastAPI endpoints that instantiate the server class and own their full URL prefixes
+- `MANUAL_ROUTER_MODULES` in `app/main.py` — escape hatch for explicitly mounting router modules that do not follow the `router*` filename rule
 
 ### API versioning
 

@@ -3,6 +3,7 @@
 ## Routing Architecture
 - `app/main.py` auto-discovers every module whose filename starts with `router` under `app/` and mounts it directly.
 - Versioned endpoints live in files such as `router_v1.py` and `router_v2.py`, and each router module owns its full path prefix.
+- `app/main.py` also supports a `MANUAL_ROUTER_MODULES` list for exceptional router modules that must be mounted explicitly.
 - API versioning uses suffix-style URLs such as `/oss/mtc/v1/...` and `/ftp-proxy/v1/...`.
 
 ## Service Layout
