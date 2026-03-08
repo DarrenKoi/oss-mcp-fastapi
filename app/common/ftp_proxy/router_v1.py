@@ -14,10 +14,19 @@ def ftp_list(
     port: int = Query(21),
     user: str = Query("anonymous"),
     password: str = Query(""),
+    timeout: int = Query(30, ge=1),
+    encoding: str | None = Query(None),
     path: str = Query("/"),
 ):
     try:
-        server = FTPProxyServer(host, port, user, password)
+        server = FTPProxyServer(
+            host,
+            port,
+            user,
+            password,
+            timeout=timeout,
+            encoding=encoding,
+        )
         return server.list_dir_response(path)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
@@ -29,10 +38,19 @@ def ftp_download(
     port: int = Query(21),
     user: str = Query("anonymous"),
     password: str = Query(""),
+    timeout: int = Query(30, ge=1),
+    encoding: str | None = Query(None),
     path: str = Query(...),
 ):
     filename = os.path.basename(path)
-    server = FTPProxyServer(host, port, user, password)
+    server = FTPProxyServer(
+        host,
+        port,
+        user,
+        password,
+        timeout=timeout,
+        encoding=encoding,
+    )
 
     return StreamingResponse(
         server.download_stream(path),
@@ -47,11 +65,20 @@ def ftp_upload(
     port: int = Query(21),
     user: str = Query("anonymous"),
     password: str = Query(""),
+    timeout: int = Query(30, ge=1),
+    encoding: str | None = Query(None),
     path: str = Query(..., description="Remote directory path to upload to"),
     file: UploadFile = File(...),
 ):
     try:
-        server = FTPProxyServer(host, port, user, password)
+        server = FTPProxyServer(
+            host,
+            port,
+            user,
+            password,
+            timeout=timeout,
+            encoding=encoding,
+        )
         remote_path = server.upload(path, file.filename, file.file)
         return {"status": "uploaded", "remote_path": remote_path}
     except Exception as e:

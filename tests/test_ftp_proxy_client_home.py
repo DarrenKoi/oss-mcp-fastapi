@@ -82,3 +82,25 @@ def test_list_files_normalizes_nested_payload_keys(monkeypatch):
     assert response["entries"][0]["is_dir"] is True
     assert response["entries"][1]["size"] == 42
     assert response["entries"][1]["is_dir"] is False
+
+
+def test_proxy_client_sends_optional_timeout_and_encoding(monkeypatch):
+    captured = {}
+
+    def fake_get(url, params):
+        captured.update(params)
+        return FakeResponse({"entries": []})
+
+    monkeypatch.setattr("app.common.ftp_proxy.ftp_proxy_client.httpx.get", fake_get)
+
+    client = FTPProxyClient(
+        "http://proxy.internal",
+        "fab-tool",
+        ftp_timeout=12,
+        ftp_encoding="cp949",
+    )
+    response = client.list_files_response("/recipes")
+
+    assert response["entries"] == []
+    assert captured["timeout"] == 12
+    assert captured["encoding"] == "cp949"
