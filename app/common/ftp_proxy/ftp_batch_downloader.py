@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Literal
 
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
+from app.common.ftp_proxy.ftp_path import normalize_remote_path, remote_basename
 
 
 @dataclass
@@ -69,10 +70,11 @@ class FTPBatchDownloader:
                 timeout=self.timeout,
                 encoding=self.encoding,
             )
+            normalized_remote_path = normalize_remote_path(remote_path)
             local_dir = Path(base_dir) / host
-            filename = Path(remote_path).name
+            filename = remote_basename(normalized_remote_path)
             local_path = str(local_dir / filename)
-            client.download(remote_path, local_path)
+            client.download(normalized_remote_path, local_path)
             return ToolDownloadResult(
                 host=host,
                 status="success",

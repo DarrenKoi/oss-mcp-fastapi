@@ -49,6 +49,35 @@ def test_direct_client_downloads_and_uploads(monkeypatch, tmp_path):
     assert fake_ftp.uploads == [("STOR upload.txt", b"new-data")]
 
 
+def test_direct_client_normalizes_windows_style_remote_paths(
+    monkeypatch, tmp_path
+):
+    fake_ftp = FakeFTP(
+        directories={"/", "C:/recipes"},
+        downloads={"C:/recipes/report.csv": b"fab-data"},
+    )
+    patch_connect(monkeypatch, FTPDirectClient, fake_ftp)
+    client = FTPDirectClient("fab-tool")
+
+    downloaded = client.download(
+        r"C:\recipes\report.csv",
+        str(tmp_path / "downloads" / "report.csv"),
+    )
+
+    upload_source = tmp_path / "upload.txt"
+    upload_source.write_bytes(b"new-data")
+    upload_result = client.upload(str(upload_source), r"C:\recipes")
+
+    assert downloaded.read_bytes() == b"fab-data"
+    assert upload_result == {
+        "status": "uploaded",
+        "remote_path": "C:/recipes/upload.txt",
+    }
+    assert ("transfercmd", "RETR C:/recipes/report.csv") in fake_ftp.commands
+    assert ("cwd", "C:/recipes") in fake_ftp.commands
+    assert fake_ftp.uploads == [("STOR upload.txt", b"new-data")]
+
+
 def test_direct_client_allows_encoding_override(monkeypatch):
     class RecordingFTP:
         instance = None

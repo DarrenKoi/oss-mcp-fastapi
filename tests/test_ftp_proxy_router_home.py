@@ -54,6 +54,30 @@ def test_download_route_streams_async_chunks(monkeypatch):
     )
 
 
+def test_download_route_uses_posix_filename_for_windows_style_path(
+    monkeypatch,
+):
+    async def fake_adownload_stream(self, path):
+        assert path == "C:/recipes/report.csv"
+        yield b"fab-data"
+
+    monkeypatch.setattr(
+        "app.common.ftp_proxy.router_v1.FTPProxyServer.adownload_stream",
+        fake_adownload_stream,
+    )
+
+    client = TestClient(app)
+    response = client.get(
+        "/ftp-proxy/v1/download",
+        params={"host": "fab-tool", "path": r"C:\recipes\report.csv"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="report.csv"'
+    )
+
+
 def test_download_route_returns_502_when_stream_fails_before_first_chunk(
     monkeypatch,
 ):

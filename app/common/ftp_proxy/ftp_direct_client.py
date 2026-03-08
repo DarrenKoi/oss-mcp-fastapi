@@ -1,11 +1,16 @@
 import asyncio
-import posixpath
 import re
 from contextlib import asynccontextmanager, contextmanager, suppress
 from datetime import datetime
 from ftplib import FTP, all_errors
 from pathlib import Path
 from typing import Any, AsyncGenerator, BinaryIO, Generator
+
+from app.common.ftp_proxy.ftp_path import (
+    join_remote_path,
+    normalize_remote_path,
+    remote_basename,
+)
 
 
 class FTPDirectClient:
@@ -414,27 +419,13 @@ class FTPDirectClient:
         return {}
 
     def _normalize_path(self, path: str) -> str:
-        normalized = str(path or "/").strip().replace("\\", "/")
-        return normalized or "/"
+        return normalize_remote_path(path)
 
     def _join_remote_path(self, base_dir: str, raw_name: str) -> str:
-        normalized_name = str(raw_name).replace("\\", "/")
-        if (
-            normalized_name.startswith("/")
-            or re.match(r"^[A-Za-z]:/", normalized_name)
-        ):
-            return normalized_name
-        if base_dir in {"", "/"}:
-            return f"/{normalized_name.lstrip('/')}"
-        return posixpath.join(base_dir.rstrip("/"), normalized_name)
+        return join_remote_path(base_dir, raw_name)
 
     def _display_name(self, raw_name: str) -> str:
-        normalized_name = (
-            str(raw_name).strip().replace("\\", "/").rstrip("/")
-        )
-        if "/" not in normalized_name:
-            return normalized_name
-        return posixpath.basename(normalized_name)
+        return remote_basename(raw_name)
 
     def _format_modify_timestamp(self, value: str | None) -> str | None:
         if not value:
@@ -482,9 +473,10 @@ class FTPDirectClient:
         return msg[:4] in ("500 ", "502 ", "504 ")
 
     def download_stream(self, path: str) -> Generator[bytes, None, None]:
+        normalized_path = self._normalize_path(path)
         with self._connect() as ftp:
             ftp.voidcmd("TYPE I")
-            with ftp.transfercmd(f"RETR {path}") as conn:
+            with ftp.transfercmd(f"RETR {normalized_path}") as conn:
                 # 메모리에 파일 전체를 올리지 않고 일정 크기씩 바로 흘려보낸다.
                 while True:
                     chunk = conn.recv(8192)
@@ -504,10 +496,12 @@ class FTPDirectClient:
     def _upload_fileobj(
         self, remote_dir: str, filename: str, file_obj: BinaryIO
     ) -> str:
-        remote_path = f"{remote_dir.rstrip('/')}/{filename}"
+        normalized_dir = self._normalize_path(remote_dir)
+        remote_name = remote_basename(filename)
+        remote_path = self._join_remote_path(normalized_dir, remote_name)
         with self._connect() as ftp:
-            ftp.cwd(remote_dir)
-            ftp.storbinary(f"STOR {filename}", file_obj)
+            ftp.cwd(normalized_dir)
+            ftp.storbinary(f"STOR {remote_name}", file_obj)
         return remote_path
 
     def upload(self, local_path: str, remote_dir: str) -> dict[str, str]:

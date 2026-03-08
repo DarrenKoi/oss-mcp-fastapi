@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.common.ftp_proxy.ftp_client_base import FTPListResponseNormalizer
+from app.common.ftp_proxy.ftp_path import normalize_remote_path
 
 
 class _FTPProxyClientBase(FTPListResponseNormalizer):
@@ -81,17 +82,24 @@ class FTPProxyClient(_FTPProxyClientBase):
         return (await self.list_files_response(path))["entries"]
 
     async def list_files_response(self, path: str = "/") -> dict[str, Any]:
-        params = {**self._ftp_params(), "path": path}
+        normalized_path = normalize_remote_path(path)
+        params = {
+            **self._ftp_params(),
+            "path": normalized_path,
+        }
         async with self._http_session() as client:
             resp = await client.get(
                 f"{self.proxy_url}/ftp-proxy/v1/list", params=params
             )
         resp.raise_for_status()
         # 서버 응답 포맷 차이를 감추고 항상 같은 목록 구조로 돌려준다.
-        return self._normalize_list_response(resp.json(), path)
+        return self._normalize_list_response(resp.json(), normalized_path)
 
     async def download(self, remote_path: str, local_path: str) -> Path:
-        params = {**self._ftp_params(), "path": remote_path}
+        params = {
+            **self._ftp_params(),
+            "path": normalize_remote_path(remote_path),
+        }
         local = Path(local_path)
         local.parent.mkdir(parents=True, exist_ok=True)
         async with self._http_session() as client:
@@ -107,7 +115,10 @@ class FTPProxyClient(_FTPProxyClientBase):
         return local
 
     async def upload(self, local_path: str, remote_dir: str) -> dict[str, Any]:
-        params = {**self._ftp_params(), "path": remote_dir}
+        params = {
+            **self._ftp_params(),
+            "path": normalize_remote_path(remote_dir),
+        }
         local = Path(local_path)
         with open(local, "rb") as file_obj:
             files = {"file": (local.name, file_obj)}

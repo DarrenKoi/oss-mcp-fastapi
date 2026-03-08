@@ -1,5 +1,6 @@
-import posixpath
 from typing import Any
+
+from app.common.ftp_proxy.ftp_path import remote_basename
 
 
 class FTPListResponseNormalizer:
@@ -156,10 +157,7 @@ class FTPListResponseNormalizer:
         return None
 
     def _display_name(self, value: Any) -> str:
-        text = str(value or "").strip().replace("\\", "/").rstrip("/")
-        if "/" not in text:
-            return text
-        return posixpath.basename(text)
+        return remote_basename(value)
 
     def _to_int(self, value: Any) -> int | None:
         if value in (None, ""):

@@ -153,3 +153,20 @@ async def test_batch_download_stream_awaits_async_progress_callback():
 
     assert progress_events == [{"host": "fab-1", "status": "success"}]
     assert summary == {"total": 1, "succeeded": 1, "failed": 0}
+
+
+async def test_batch_client_normalizes_windows_style_remote_paths():
+    payload = {"total": 1, "succeeded": 1, "failed": 0}
+    http_client = FakeAsyncHTTPClient(post_payload=payload)
+    client = FTPBatchClient("http://proxy.internal", http_client=http_client)
+
+    response = await client.batch_download(
+        ["fab-1"],
+        r"C:\recipes\report.csv",
+        "/tmp/downloads",
+    )
+
+    assert response == payload
+    assert http_client.calls[0][2]["json"]["remote_path"] == (
+        "C:/recipes/report.csv"
+    )

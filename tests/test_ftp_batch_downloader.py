@@ -56,6 +56,28 @@ class TestBatchDownloadSuccess:
         assert (tmp_path / "192.168.1.10" / "recipe.dat").read_bytes() == b"recipe-a"
         assert (tmp_path / "192.168.1.20" / "recipe.dat").read_bytes() == b"recipe-b"
 
+    def test_windows_style_remote_path_uses_remote_filename(
+        self, monkeypatch, tmp_path
+    ):
+        fakes = {
+            "192.168.1.10": FakeFTP(
+                downloads={"C:/recipes/recipe.dat": b"recipe-a"}
+            )
+        }
+        patch_connect_multi(monkeypatch, FTPDirectClient, fakes)
+
+        downloader = FTPBatchDownloader()
+        result = downloader.batch_download(
+            hosts=["192.168.1.10"],
+            remote_path=r"C:\recipes\recipe.dat",
+            base_dir=str(tmp_path),
+        )
+
+        assert result.succeeded == 1
+        assert (
+            tmp_path / "192.168.1.10" / "recipe.dat"
+        ).read_bytes() == b"recipe-a"
+
 
 class TestBatchDownloadPartialFailure:
     def test_partial_failure_counts(self, monkeypatch, tmp_path):

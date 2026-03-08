@@ -1,5 +1,4 @@
 import json
-import os
 import queue
 import threading
 
@@ -8,6 +7,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.common.ftp_proxy.ftp_batch_downloader import FTPBatchDownloader
+from app.common.ftp_proxy.ftp_path import (
+    normalize_remote_path,
+    remote_basename,
+)
 from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 
 router = APIRouter(prefix="/ftp-proxy/v1", tags=["FTP Proxy"])
@@ -41,6 +44,7 @@ async def ftp_list(
     path: str = Query("/"),
 ):
     try:
+        normalized_path = normalize_remote_path(path)
         server = FTPProxyServer(
             host,
             port,
@@ -49,7 +53,7 @@ async def ftp_list(
             timeout=timeout,
             encoding=encoding,
         )
-        return await server.alist_dir_response(path)
+        return await server.alist_dir_response(normalized_path)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
 
@@ -64,7 +68,8 @@ async def ftp_download(
     encoding: str | None = Query(None),
     path: str = Query(...),
 ):
-    filename = os.path.basename(path.rstrip("/")) or "download"
+    normalized_path = normalize_remote_path(path)
+    filename = remote_basename(normalized_path, default="download")
 
     try:
         server = FTPProxyServer(
@@ -75,7 +80,7 @@ async def ftp_download(
             timeout=timeout,
             encoding=encoding,
         )
-        stream = await _prime_stream(server.adownload_stream(path))
+        stream = await _prime_stream(server.adownload_stream(normalized_path))
         return StreamingResponse(
             stream,
             media_type="application/octet-stream",
@@ -97,6 +102,7 @@ async def ftp_upload(
     file: UploadFile = File(...),
 ):
     try:
+        normalized_path = normalize_remote_path(path)
         server = FTPProxyServer(
             host,
             port,
@@ -105,7 +111,9 @@ async def ftp_upload(
             timeout=timeout,
             encoding=encoding,
         )
-        remote_path = await server.aupload(path, file.filename, file.file)
+        remote_path = await server.aupload(
+            normalized_path, file.filename, file.file
+        )
         return {"status": "uploaded", "remote_path": remote_path}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
@@ -150,7 +158,7 @@ def ftp_batch_download(request: BatchDownloadRequest):
     downloader = _make_downloader(request)
     result = downloader.batch_download(
         hosts=request.hosts,
-        remote_path=request.remote_path,
+        remote_path=normalize_remote_path(request.remote_path),
         base_dir=request.base_dir,
         max_workers=request.max_workers,
     )
@@ -180,7 +188,7 @@ def ftp_batch_download_stream(request: BatchDownloadRequest):
         def run_batch():
             result = downloader.batch_download(
                 hosts=request.hosts,
-                remote_path=request.remote_path,
+                remote_path=normalize_remote_path(request.remote_path),
                 base_dir=request.base_dir,
                 max_workers=request.max_workers,
                 on_complete=on_complete,

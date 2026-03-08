@@ -165,6 +165,39 @@ async def test_upload(tmp_path):
     assert files["file"][0] == "data.txt"
 
 
+async def test_client_normalizes_windows_style_remote_paths(tmp_path):
+    upload_response = {
+        "status": "uploaded",
+        "remote_path": "C:/recipes/data.txt",
+    }
+    http_client = FakeAsyncHTTPClient(
+        get_payload={"entries": []},
+        post_payload=upload_response,
+        stream_chunks=[b"fab-data"],
+    )
+    client = FTPProxyClient(
+        "http://proxy.internal",
+        "fab-tool",
+        http_client=http_client,
+    )
+
+    await client.list_files_response(r" \recipes\subdir\ ")
+    downloaded = await client.download(
+        r"C:\recipes\report.csv",
+        str(tmp_path / "downloads" / "report.csv"),
+    )
+
+    upload_source = tmp_path / "data.txt"
+    upload_source.write_bytes(b"fab-data")
+    upload_result = await client.upload(str(upload_source), r"C:\recipes")
+
+    assert downloaded.read_bytes() == b"fab-data"
+    assert upload_result == upload_response
+    assert http_client.calls[0][2]["params"]["path"] == "/recipes/subdir"
+    assert http_client.calls[1][2]["params"]["path"] == "C:/recipes/report.csv"
+    assert http_client.calls[2][2]["params"]["path"] == "C:/recipes"
+
+
 async def test_client_sends_optional_timeout_and_encoding():
     http_client = FakeAsyncHTTPClient(get_payload={"entries": []})
     client = FTPProxyClient(

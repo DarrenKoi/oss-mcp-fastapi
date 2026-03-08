@@ -49,7 +49,11 @@ class FakeFTP:
             resolved = self.current_dir
         else:
             candidate = str(path).replace("\\", "/")
-            if candidate.startswith("/"):
+            if candidate.startswith("/") or (
+                len(candidate) >= 3
+                and candidate[0].isalpha()
+                and candidate[1:3] == ":/"
+            ):
                 resolved = candidate
             elif self.current_dir == "/":
                 resolved = f"/{candidate}"

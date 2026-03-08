@@ -7,6 +7,8 @@ from typing import Any, Callable
 
 import httpx
 
+from app.common.ftp_proxy.ftp_path import normalize_remote_path
+
 
 class FTPBatchClient:
     """여러 FTP 호스트 대상 배치 다운로드 API를 호출하는 클라이언트."""
@@ -47,7 +49,7 @@ class FTPBatchClient:
     ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "hosts": hosts,
-            "remote_path": remote_path,
+            "remote_path": normalize_remote_path(remote_path),
             "base_dir": base_dir,
             "port": self.port,
             "user": self.user,
