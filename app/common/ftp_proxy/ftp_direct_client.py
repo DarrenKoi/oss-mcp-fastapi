@@ -352,7 +352,7 @@ class FTPDirectClient:
 
         facts = self._parse_mlst_response(response)
         if not facts:
-            return None, False
+            return None, True
         return facts, True
 
     def _try_size(self, ftp: FTP, remote_path: str) -> int | None:
@@ -390,7 +390,7 @@ class FTPDirectClient:
         return {}
 
     def _normalize_path(self, path: str) -> str:
-        normalized = (path or "/").replace("\\", "/")
+        normalized = str(path or "/").strip().replace("\\", "/")
         return normalized or "/"
 
     def _join_remote_path(self, base_dir: str, raw_name: str) -> str:
@@ -405,7 +405,9 @@ class FTPDirectClient:
         return posixpath.join(base_dir.rstrip("/"), normalized_name)
 
     def _display_name(self, raw_name: str) -> str:
-        normalized_name = str(raw_name).replace("\\", "/").rstrip("/")
+        normalized_name = (
+            str(raw_name).strip().replace("\\", "/").rstrip("/")
+        )
         if "/" not in normalized_name:
             return normalized_name
         return posixpath.basename(normalized_name)

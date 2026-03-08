@@ -1,4 +1,5 @@
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
+from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 from tests.ftp_fakes import FakeFTP, patch_connect
 
 
@@ -88,3 +89,29 @@ def test_direct_client_allows_encoding_override(monkeypatch):
     assert RecordingFTP.instance.connected == ("fab-tool", 21, 17)
     assert RecordingFTP.instance.logged_in == ("operator", "secret")
     assert RecordingFTP.instance.quit_called is True
+
+
+def test_proxy_server_upload_supports_base_and_stream_signatures(
+    monkeypatch, tmp_path
+):
+    fake_ftp = FakeFTP(directories={"/", "/recipes"})
+    patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+    server = FTPProxyServer("fab-tool")
+
+    upload_source = tmp_path / "upload.txt"
+    upload_source.write_bytes(b"new-data")
+
+    base_result = server.upload(str(upload_source), "/recipes")
+
+    with open(upload_source, "rb") as file_obj:
+        stream_result = server.upload("/recipes", "stream.txt", file_obj)
+
+    assert base_result == {
+        "status": "uploaded",
+        "remote_path": "/recipes/upload.txt",
+    }
+    assert stream_result == "/recipes/stream.txt"
+    assert fake_ftp.uploads == [
+        ("STOR upload.txt", b"new-data"),
+        ("STOR stream.txt", b"new-data"),
+    ]

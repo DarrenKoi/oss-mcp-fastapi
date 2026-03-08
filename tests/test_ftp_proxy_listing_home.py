@@ -106,6 +106,67 @@ def test_list_dir_falls_back_to_windows_list_parsing(monkeypatch):
     assert by_name["wafer map.csv"]["size"] == 512
 
 
+def test_list_dir_strips_requested_path_whitespace(monkeypatch):
+    fake_ftp = FakeFTP(
+        directories={"/", "/recipes"},
+        mlsd_entries={"/recipes": [("report.csv", {"type": "file"})]},
+    )
+    patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+
+    response = FTPProxyServer("fab-tool").list_dir_response("  /recipes  ")
+
+    assert response["path"] == "/recipes"
+    assert response["strategy"] == "mlsd_path"
+    assert [entry["name"] for entry in response["entries"]] == [
+        "report.csv"
+    ]
+
+
+def test_list_dir_parses_unix_symlink_and_acl_suffix(monkeypatch):
+    fake_ftp = FakeFTP(
+        directories={"/", "/recipes"},
+        mlsd_entries=error_perm("500 MLSD not supported"),
+        list_lines={
+            "/recipes": [
+                "lrwxrwxrwx@ 1 owner group 12 Mar 08 14:30 latest -> report.csv",
+                "-rw-r--r--+ 1 owner group 128 Mar 08 14:31 report.csv",
+            ]
+        },
+    )
+    patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+
+    entries = FTPProxyServer("fab-tool").list_dir("/recipes")
+    by_name = {entry["name"]: entry for entry in entries}
+
+    assert by_name["latest"]["is_dir"] is False
+    assert by_name["latest"]["permissions"] == "lrwxrwxrwx@"
+    assert by_name["latest"]["link_target"] == "report.csv"
+    assert by_name["report.csv"]["permissions"] == "-rw-r--r--+"
+
+
+def test_list_dir_parses_windows_list_slash_date_and_spaced_ampm(
+    monkeypatch,
+):
+    fake_ftp = FakeFTP(
+        directories={"/", "/recipes"},
+        mlsd_entries=error_perm("500 MLSD not supported"),
+        list_lines={
+            "/recipes": [
+                "03/08/2026  2:30 PM       <DIR>          Recipe Data",
+                "03/08/2026  2:31 PM                  512 wafer map.csv",
+            ]
+        },
+    )
+    patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+
+    entries = FTPProxyServer("fab-tool").list_dir("/recipes")
+    by_name = {entry["name"]: entry for entry in entries}
+
+    assert by_name["Recipe Data"]["is_dir"] is True
+    assert by_name["wafer map.csv"]["is_dir"] is False
+    assert by_name["wafer map.csv"]["size"] == 512
+
+
 def test_list_dir_falls_back_to_nlst_with_best_effort_metadata(
     monkeypatch,
 ):
@@ -162,3 +223,37 @@ def test_list_dir_falls_back_when_mlst_response_has_no_parseable_facts(
     assert by_name["docs"]["is_dir"] is True
     assert by_name["report.csv"]["is_dir"] is False
     assert by_name["report.csv"]["size"] == 99
+
+
+def test_list_dir_keeps_trying_mlst_after_empty_facts(monkeypatch):
+    fake_ftp = FakeFTP(
+        directories={"/", "/recipes", "/recipes/docs"},
+        mlsd_entries=error_perm("500 MLSD not supported"),
+        list_lines=error_perm("500 LIST not supported"),
+        nlst_entries={"/recipes": ["docs", "report.csv"]},
+        mlst_responses={
+            "/recipes/docs": "250 docs listing without facts",
+            "/recipes/report.csv": (
+                "250-Listing\n"
+                " type=file;size=321;modify=20260308150100; "
+                "/recipes/report.csv\n"
+                "250 End"
+            ),
+        },
+    )
+    patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+
+    entries = FTPProxyServer("fab-tool").list_dir("/recipes")
+    by_name = {entry["name"]: entry for entry in entries}
+    mlst_commands = [
+        command for command in fake_ftp.commands if command[0] == "sendcmd"
+    ]
+
+    assert by_name["docs"]["is_dir"] is True
+    assert by_name["report.csv"]["is_dir"] is False
+    assert by_name["report.csv"]["size"] == 321
+    assert by_name["report.csv"]["date"] == "2026-03-08 15:01:00"
+    assert mlst_commands == [
+        ("sendcmd", "MLST /recipes/docs"),
+        ("sendcmd", "MLST /recipes/report.csv"),
+    ]
