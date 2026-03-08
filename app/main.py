@@ -1,3 +1,6 @@
+# collections.abc의 Iterable, Sequence는 "이 값이 어떤 식으로 다뤄지는지"를 설명하는 타입 힌트다.
+# - Iterable[str]: for 문으로 순회할 수 있는 문자열 묶음이면 된다. (예: list, tuple, generator)
+# - Sequence[str]: 순서가 있는 문자열 목록이다. (예: list, tuple)
 from collections.abc import Iterable, Sequence
 from importlib import import_module
 from pkgutil import walk_packages
@@ -8,6 +11,12 @@ import app as app_package
 
 
 # 자동 규칙으로 찾을 수 없는 라우터 모듈이 있으면 여기에 dotted path를 수동 등록한다.
+# 예:
+# MANUAL_ROUTER_MODULES = (
+#     "app.oss.custom_manual_routes",
+#     "app.ftp_proxy.special_router_module",
+# )
+# 위 문자열은 "router 변수를 export하는 파이썬 모듈 경로"여야 한다.
 MANUAL_ROUTER_MODULES: tuple[str, ...] = ()
 
 
@@ -22,8 +31,10 @@ def discover_router_module_names(
     manual_router_modules: Sequence[str] | None = None,
 ) -> list[str]:
     # 기본값으로 app 패키지 전체를 검색하되, 테스트에서는 다른 패키지를 주입할 수 있다.
+    # package_paths는 "순회만 가능하면 되는" 입력이라 Iterable[str]로 받는다.
     search_paths = app_package.__path__ if package_paths is None else package_paths
     search_package_name = app_package.__name__ if package_name is None else package_name
+    # manual_router_modules는 순서를 가진 모듈 경로 목록이라 Sequence[str]로 받는다.
     # 수동 등록 목록도 자동 탐색 결과와 함께 합쳐서 중복 없이 관리한다.
     module_names = set(MANUAL_ROUTER_MODULES if manual_router_modules is None else manual_router_modules)
 
