@@ -1,3 +1,4 @@
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,22 +12,30 @@ from app.common.ftp_proxy.ftp_path import normalize_remote_path
 
 logger = get_ftp_proxy_logger("client").getChild("proxy_client")
 
+DEFAULT_PROXY_URL = "http://127.0.0.1:8000"
+
+
+def _default_proxy_url() -> str:
+    return os.getenv("FTP_PROXY_URL", DEFAULT_PROXY_URL).rstrip("/")
+
 
 class _FTPProxyClientBase(FTPListResponseNormalizer):
     """프록시 클라이언트가 공통으로 쓰는 FTP 접속 설정."""
 
     def __init__(
         self,
-        proxy_url: str,
         ftp_host: str,
         ftp_port: int = 21,
         ftp_user: str = "anonymous",
         ftp_password: str = "",
         *,
+        proxy_url: str | None = None,
         ftp_timeout: int | None = None,
         ftp_encoding: str | None = None,
     ):
-        self.proxy_url = proxy_url.rstrip("/")
+        self.proxy_url = (
+            proxy_url.rstrip("/") if proxy_url else _default_proxy_url()
+        )
         self.ftp_host = ftp_host
         self.ftp_port = ftp_port
         self.ftp_user = ftp_user
@@ -56,22 +65,30 @@ class FTPProxyClient(_FTPProxyClientBase):
 
     def __init__(
         self,
-        proxy_url: str,
-        ftp_host: str,
+        proxy_url_or_ftp_host: str,
+        ftp_host: str | None = None,
         ftp_port: int = 21,
         ftp_user: str = "anonymous",
         ftp_password: str = "",
         *,
+        proxy_url: str | None = None,
         ftp_timeout: int | None = None,
         ftp_encoding: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ):
+        # 기존 "proxy_url, ftp_host" 호출과
+        # 새 "ftp_host" 단독 호출을 모두 허용한다.
+        if ftp_host is None:
+            ftp_host = proxy_url_or_ftp_host
+        elif proxy_url is None:
+            proxy_url = proxy_url_or_ftp_host
+
         super().__init__(
-            proxy_url,
             ftp_host,
             ftp_port,
             ftp_user,
             ftp_password,
+            proxy_url=proxy_url,
             ftp_timeout=ftp_timeout,
             ftp_encoding=ftp_encoding,
         )

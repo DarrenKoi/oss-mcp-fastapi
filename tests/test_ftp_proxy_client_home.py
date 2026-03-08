@@ -112,6 +112,19 @@ async def test_list_files():
     assert entries[0]["name"] == "logs"
 
 
+async def test_client_uses_env_default_proxy_url(monkeypatch):
+    monkeypatch.setenv("FTP_PROXY_URL", "http://proxy.from.env:9000/")
+    client = FTPProxyClient(
+        "fab-tool",
+        http_client=FakeAsyncHTTPClient(get_payload={"entries": []}),
+    )
+
+    response = await client.list_files_response("/recipes")
+
+    assert response["entries"] == []
+    assert client.proxy_url == "http://proxy.from.env:9000"
+
+
 async def test_download(tmp_path, caplog):
     http_client = FakeAsyncHTTPClient(stream_chunks=[b"fab-", b"data"])
     client = FTPProxyClient(
