@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import inspect
 import json
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from typing import Any, Callable
 
 import httpx
@@ -19,7 +20,7 @@ class FTPBatchClient:
         password: str = "",
         timeout: int | None = None,
         encoding: str | None = None,
-        http_client: httpx.Client | None = None,
+        http_client: httpx.AsyncClient | None = None,
     ):
         self.proxy_url = proxy_url.rstrip("/")
         self.port = port
@@ -29,12 +30,12 @@ class FTPBatchClient:
         self.encoding = encoding
         self.http_client = http_client
 
-    @contextmanager
-    def _http_session(self):
+    @asynccontextmanager
+    async def _http_session(self):
         if self.http_client is not None:
             yield self.http_client
             return
-        with httpx.Client() as client:
+        async with httpx.AsyncClient() as client:
             yield client
 
     def _build_body(
@@ -59,7 +60,7 @@ class FTPBatchClient:
             body["encoding"] = self.encoding
         return body
 
-    def batch_download(
+    async def batch_download(
         self,
         hosts: list[str],
         remote_path: str,
@@ -68,8 +69,8 @@ class FTPBatchClient:
         max_workers: int = 4,
     ) -> dict[str, Any]:
         body = self._build_body(hosts, remote_path, base_dir, max_workers)
-        with self._http_session() as client:
-            resp = client.post(
+        async with self._http_session() as client:
+            resp = await client.post(
                 f"{self.proxy_url}/ftp-proxy/v1/batch-download",
                 json=body,
                 timeout=httpx.Timeout(timeout=None),
@@ -77,32 +78,34 @@ class FTPBatchClient:
         resp.raise_for_status()
         return resp.json()
 
-    def batch_download_stream(
+    async def batch_download_stream(
         self,
         hosts: list[str],
         remote_path: str,
         base_dir: str,
         *,
         max_workers: int = 4,
-        on_progress: Callable[[dict[str, Any]], None] | None = None,
+        on_progress: Callable[[dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
         body = self._build_body(hosts, remote_path, base_dir, max_workers)
         summary: dict[str, Any] = {}
-        with self._http_session() as client:
-            with client.stream(
+        async with self._http_session() as client:
+            async with client.stream(
                 "POST",
                 f"{self.proxy_url}/ftp-proxy/v1/batch-download/stream",
                 json=body,
                 timeout=httpx.Timeout(timeout=None),
             ) as resp:
                 resp.raise_for_status()
-                for line in resp.iter_lines():
+                async for line in resp.aiter_lines():
                     # SSE는 event/data 줄 단위로 오므로 data 줄만 골라
                     # 진행 상황과 최종 요약을 각각 해석한다.
                     if line.startswith("data: "):
                         data = json.loads(line[6:])
                         if "host" in data and on_progress:
-                            on_progress(data)
+                            callback_result = on_progress(data)
+                            if inspect.isawaitable(callback_result):
+                                await callback_result
                         elif "total" in data:
                             summary = data
         return summary
