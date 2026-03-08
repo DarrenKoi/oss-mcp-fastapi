@@ -3,6 +3,8 @@ from typing import Any
 
 
 class FTPListResponseNormalizer:
+    """프록시 응답 형태가 조금씩 달라도 공통 목록 포맷으로 맞춘다."""
+
     LIST_KEYS = ("entries", "files", "items", "listing", "data")
     PATH_KEYS = ("path", "directory", "folder", "cwd")
     STRATEGY_KEYS = ("strategy", "method", "listing_method", "source")
@@ -10,6 +12,8 @@ class FTPListResponseNormalizer:
     def _normalize_list_response(
         self, payload: Any, requested_path: str
     ) -> dict[str, Any]:
+        # 응답에서 실제 목록 배열과 부가 메타데이터를 뽑아
+        # SDK가 항상 같은 키 구조를 보게 만든다.
         entries_payload = self._extract_entries(payload)
         if entries_payload is None:
             raise ValueError(
@@ -39,6 +43,8 @@ class FTPListResponseNormalizer:
         }
 
     def _extract_entries(self, payload: Any) -> list[Any] | None:
+        # 서버 구현마다 entries/files/items 등 키 이름이 다를 수 있어서
+        # 후보 키를 순서대로 훑고, 중첩 딕셔너리도 재귀적으로 살핀다.
         if isinstance(payload, list):
             return payload
 
@@ -72,6 +78,8 @@ class FTPListResponseNormalizer:
         return None
 
     def _normalize_entry(self, entry: Any) -> dict[str, Any]:
+        # 문자열만 오는 단순 목록 응답도 후속 코드에서 같은 형태로
+        # 다룰 수 있게 dict 구조로 승격한다.
         if isinstance(entry, str):
             return {
                 "name": self._display_name(entry),

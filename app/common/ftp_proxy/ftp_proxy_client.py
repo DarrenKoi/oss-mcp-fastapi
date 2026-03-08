@@ -8,7 +8,7 @@ from app.common.ftp_proxy.ftp_client_base import FTPListResponseNormalizer
 
 
 class _FTPProxyClientBase(FTPListResponseNormalizer):
-    """Shared config for sync and async proxy clients."""
+    """동기/비동기 프록시 클라이언트가 공통으로 쓰는 FTP 접속 설정."""
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class _FTPProxyClientBase(FTPListResponseNormalizer):
 
 
 class FTPProxyClient(_FTPProxyClientBase):
-    """HTTP SDK for office users to access the FTP proxy server."""
+    """HTTP 프록시를 통해 FTP 작업을 수행하는 동기 SDK."""
 
     def __init__(
         self,
@@ -87,6 +87,7 @@ class FTPProxyClient(_FTPProxyClientBase):
                 f"{self.proxy_url}/ftp-proxy/v1/list", params=params
             )
         resp.raise_for_status()
+        # 서버 응답 포맷 차이를 감추고 항상 같은 목록 구조로 돌려준다.
         return self._normalize_list_response(resp.json(), path)
 
     def download(self, remote_path: str, local_path: str) -> Path:
@@ -121,7 +122,7 @@ class FTPProxyClient(_FTPProxyClientBase):
 
 
 class AsyncFTPProxyClient(_FTPProxyClientBase):
-    """Async HTTP SDK for office users to access the FTP proxy server."""
+    """HTTP 프록시를 통해 FTP 작업을 수행하는 비동기 SDK."""
 
     def __init__(
         self,

@@ -14,6 +14,8 @@ router = APIRouter(prefix="/ftp-proxy/v1", tags=["FTP Proxy"])
 
 
 async def _prime_stream(stream):
+    # 첫 청크를 먼저 당겨서 연결/권한 오류를 응답 시작 전에 드러내면
+    # 중간에 깨진 스트림 대신 정상적인 HTTP 에러로 돌려줄 수 있다.
     first_chunk = await anext(stream, None)
 
     async def body():
@@ -110,6 +112,8 @@ async def ftp_upload(
 
 
 class BatchDownloadRequest(BaseModel):
+    """여러 FTP 호스트에서 같은 경로를 병렬 다운로드하기 위한 요청 모델."""
+
     hosts: list[str] = Field(..., min_length=1)
     remote_path: str
     base_dir: str
@@ -164,6 +168,8 @@ def ftp_batch_download_stream(request: BatchDownloadRequest):
     downloader = _make_downloader(request)
 
     def event_stream():
+        # 배치 작업은 별도 스레드에서 돌리고, 완료된 개별 결과만 큐를 통해
+        # SSE 클라이언트로 밀어 넣는다.
         q: queue.Queue = queue.Queue()
 
         def on_complete(tool_result):

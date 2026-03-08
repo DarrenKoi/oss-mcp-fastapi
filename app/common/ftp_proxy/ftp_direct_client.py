@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator, BinaryIO, Generator
 
 
 class FTPDirectClient:
-    """Direct FTP client for cloud-side access to fab tools."""
+    """FTP 서버에 직접 붙어 목록 조회, 다운로드, 업로드를 수행한다."""
 
     UNIX_LIST_PATTERN = re.compile(
         r"^(?P<permissions>[bcdlps-][rwxStTs-]{9}[+.@]?)\s+"
@@ -84,6 +84,8 @@ class FTPDirectClient:
         first_empty: dict[str, Any] | None = None
 
         with self._connect() as ftp:
+            # FTP 서버마다 지원하는 명령이 달라서,
+            # 성공할 때까지 여러 조회 전략을 순차적으로 시도한다.
             strategies = (
                 ("mlsd_path", self._list_via_mlsd_path),
                 ("mlsd_cwd", self._list_via_mlsd_cwd),
@@ -223,6 +225,8 @@ class FTPDirectClient:
         self, ftp: FTP, base_dir: str, names: list[str]
     ) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
+        # MLST 지원 여부는 서버 단위 특성이라 첫 실패 후에는
+        # 같은 연결에서 반복 호출하지 않도록 상태를 이어받는다.
         mlst_available = True
         for raw_name in names:
             display_name = self._display_name(raw_name)
@@ -246,6 +250,8 @@ class FTPDirectClient:
         *,
         try_mlst: bool = True,
     ) -> tuple[dict[str, Any], bool]:
+        # NLST는 이름만 주기 때문에 가능하면 MLST/SIZE/CWD 테스트를 섞어
+        # 파일 크기와 디렉터리 여부를 최대한 복원한다.
         if try_mlst:
             facts, mlst_available = self._try_mlst(ftp, remote_path)
             if facts:
@@ -289,6 +295,8 @@ class FTPDirectClient:
         if not stripped or stripped.lower().startswith("total "):
             return None
 
+        # LIST 출력은 서버 OS에 따라 형식이 다르므로
+        # 유닉스 형식과 윈도우 형식을 각각 파싱한다.
         unix_match = self.UNIX_LIST_PATTERN.match(stripped)
         if unix_match:
             name = unix_match.group("name")
@@ -362,6 +370,8 @@ class FTPDirectClient:
         try:
             response = ftp.sendcmd(f"MLST {remote_path}")
         except all_errors as exc:
+            # 명령 자체를 모르는 서버라면 이후 호출을 생략할 수 있게
+            # "지원 여부" 플래그를 함께 반환한다.
             return None, not self._is_command_not_supported(exc)
 
         facts = self._parse_mlst_response(response)
@@ -475,6 +485,7 @@ class FTPDirectClient:
         with self._connect() as ftp:
             ftp.voidcmd("TYPE I")
             with ftp.transfercmd(f"RETR {path}") as conn:
+                # 메모리에 파일 전체를 올리지 않고 일정 크기씩 바로 흘려보낸다.
                 while True:
                     chunk = conn.recv(8192)
                     if not chunk:
@@ -518,6 +529,8 @@ class FTPDirectClient:
         sentinel = object()
         try:
             while True:
+                # 동기 generator를 스레드로 감싸서 FastAPI async 경로에서도
+                # 같은 다운로드 로직을 재사용한다.
                 chunk = await asyncio.to_thread(next, gen, sentinel)
                 if chunk is sentinel:
                     break

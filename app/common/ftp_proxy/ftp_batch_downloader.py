@@ -11,6 +11,8 @@ from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
 
 @dataclass
 class ToolDownloadResult:
+    """개별 호스트 한 대의 다운로드 결과."""
+
     host: str
     status: Literal["success", "failed"]
     local_path: str | None = None
@@ -20,6 +22,8 @@ class ToolDownloadResult:
 
 @dataclass
 class BatchDownloadResult:
+    """배치 다운로드 전체 집계 결과."""
+
     total: int = 0
     succeeded: int = 0
     failed: int = 0
@@ -28,10 +32,10 @@ class BatchDownloadResult:
 
 
 class FTPBatchDownloader:
-    """Downloads the same file(s) from multiple FTP hosts concurrently.
+    """여러 FTP 호스트에서 같은 경로를 동시에 내려받는다.
 
-    Organises output as ``{base_dir}/{host}/{filename}`` so files from
-    different tools never overwrite each other.
+    저장 경로를 ``{base_dir}/{host}/{filename}`` 형태로 고정해서
+    장비별 파일이 서로 덮어쓰지 않게 한다.
     """
 
     MAX_WORKERS_CAP = 8
@@ -54,7 +58,7 @@ class FTPBatchDownloader:
     def _download_one(
         self, host: str, remote_path: str, base_dir: str
     ) -> ToolDownloadResult:
-        """Download a single file from one host. Runs in a worker thread."""
+        """워커 스레드 하나가 담당하는 단일 호스트 다운로드 작업."""
         start = time.monotonic()
         try:
             client = FTPDirectClient(
@@ -97,6 +101,8 @@ class FTPBatchDownloader:
         start = time.monotonic()
 
         with ThreadPoolExecutor(max_workers=effective_workers) as executor:
+            # 완료 순서대로 결과를 수집해서, 느린 호스트가 있어도
+            # 먼저 끝난 작업의 상태를 바로 상위 호출자에 전달할 수 있다.
             futures = {
                 executor.submit(
                     self._download_one, host, remote_path, base_dir

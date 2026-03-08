@@ -5,7 +5,7 @@ from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
 
 
 class FTPProxyServer(FTPDirectClient):
-    """Proxy adapter that exposes direct FTP operations over HTTP."""
+    """직접 FTP 클라이언트를 FastAPI 라우터에서 쓰기 쉽게 감싼 어댑터."""
 
     def list_dir(self, path: str = "/") -> list[dict[str, Any]]:
         return self.list_files(path)
@@ -26,6 +26,8 @@ class FTPProxyServer(FTPDirectClient):
     def upload(
         self, arg1: str, arg2: str, file: BinaryIO | None = None
     ) -> dict[str, str] | str:
+        # 로컬 파일 경로 업로드와 업로드된 file object 업로드를
+        # 같은 이름으로 제공하기 위해 인자 조합에 따라 분기한다.
         if file is None:
             return super().upload(arg1, arg2)
         return self._upload_fileobj(arg1, arg2, file)

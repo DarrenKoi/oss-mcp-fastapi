@@ -8,7 +8,7 @@ import httpx
 
 
 class FTPBatchClient:
-    """HTTP SDK for triggering batch downloads across multiple FTP hosts."""
+    """여러 FTP 호스트 대상 배치 다운로드 API를 호출하는 클라이언트."""
 
     def __init__(
         self,
@@ -97,6 +97,8 @@ class FTPBatchClient:
             ) as resp:
                 resp.raise_for_status()
                 for line in resp.iter_lines():
+                    # SSE는 event/data 줄 단위로 오므로 data 줄만 골라
+                    # 진행 상황과 최종 요약을 각각 해석한다.
                     if line.startswith("data: "):
                         data = json.loads(line[6:])
                         if "host" in data and on_progress:
