@@ -1,4 +1,5 @@
 import threading
+import logging
 
 from app.common.ftp_proxy.ftp_batch_downloader import FTPBatchDownloader
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
@@ -80,12 +81,13 @@ class TestBatchDownloadSuccess:
 
 
 class TestBatchDownloadPartialFailure:
-    def test_partial_failure_counts(self, monkeypatch, tmp_path):
+    def test_partial_failure_counts(self, monkeypatch, tmp_path, caplog):
         fakes = {
             "10.0.0.1": FakeFTP(downloads={"/data/log.csv": b"ok"}),
             "10.0.0.2": FakeFTP(downloads={}),  # file not found
         }
         patch_connect_multi(monkeypatch, FTPDirectClient, fakes)
+        caplog.set_level(logging.INFO)
 
         downloader = FTPBatchDownloader()
         result = downloader.batch_download(
@@ -106,6 +108,21 @@ class TestBatchDownloadPartialFailure:
         assert len(failed) == 1
         assert failed[0].host == "10.0.0.2"
         assert failed[0].error is not None
+        assert (
+            "Starting FTP batch download hosts=2 remote_path=/data/log.csv"
+        ) in caplog.text
+        assert (
+            "Completed FTP batch host download host=10.0.0.1 "
+            "remote_path=/data/log.csv"
+        ) in caplog.text
+        assert (
+            "Failed FTP batch host download host=10.0.0.2 "
+            "remote_path=/data/log.csv"
+        ) in caplog.text
+        assert (
+            "Completed FTP batch download hosts=2 remote_path=/data/log.csv "
+            "succeeded=1 failed=1"
+        ) in caplog.text
 
     def test_successful_downloads_unaffected_by_failures(
         self, monkeypatch, tmp_path

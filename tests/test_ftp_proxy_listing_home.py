@@ -1,10 +1,11 @@
 from ftplib import error_perm
+import logging
 
 from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 from tests.ftp_fakes import FakeFTP, patch_connect
 
 
-def test_list_dir_uses_mlsd_when_available(monkeypatch):
+def test_list_dir_uses_mlsd_when_available(monkeypatch, caplog):
     fake_ftp = FakeFTP(
         directories={"/", "/recipes"},
         mlsd_entries={
@@ -22,6 +23,7 @@ def test_list_dir_uses_mlsd_when_available(monkeypatch):
         },
     )
     patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
+    caplog.set_level(logging.INFO)
 
     entries = FTPProxyServer("fab-tool").list_dir("/recipes")
     by_name = {entry["name"]: entry for entry in entries}
@@ -31,6 +33,11 @@ def test_list_dir_uses_mlsd_when_available(monkeypatch):
     assert by_name["report.csv"]["is_dir"] is False
     assert by_name["report.csv"]["size"] == 128
     assert any(command[0] == "mlsd" for command in fake_ftp.commands)
+    assert "Starting FTP list target=fab-tool:21 path=/recipes" in caplog.text
+    assert (
+        "Completed FTP list target=fab-tool:21 path=/recipes entries=2 "
+        "strategy=mlsd_path"
+    ) in caplog.text
 
 
 def test_list_dir_tries_cwd_mlsd_after_path_mlsd_failure(monkeypatch):

@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import inspect
 import json
+import time
 from contextlib import asynccontextmanager
 from typing import Any, Callable
 
 import httpx
 
+from app.common.ftp_proxy.ftp_logger import get_ftp_proxy_logger
 from app.common.ftp_proxy.ftp_path import normalize_remote_path
+
+logger = get_ftp_proxy_logger("client").getChild("batch_client")
 
 
 class FTPBatchClient:
@@ -70,15 +74,49 @@ class FTPBatchClient:
         *,
         max_workers: int = 4,
     ) -> dict[str, Any]:
+        start = time.monotonic()
         body = self._build_body(hosts, remote_path, base_dir, max_workers)
-        async with self._http_session() as client:
-            resp = await client.post(
-                f"{self.proxy_url}/ftp-proxy/v1/batch-download",
-                json=body,
-                timeout=httpx.Timeout(timeout=None),
+        logger.info(
+            "Starting proxy batch download proxy_url=%s hosts=%d "
+            "remote_path=%s base_dir=%s max_workers=%d",
+            self.proxy_url,
+            len(hosts),
+            body["remote_path"],
+            base_dir,
+            max_workers,
+        )
+        try:
+            async with self._http_session() as client:
+                resp = await client.post(
+                    f"{self.proxy_url}/ftp-proxy/v1/batch-download",
+                    json=body,
+                    timeout=httpx.Timeout(timeout=None),
+                )
+            resp.raise_for_status()
+            response = resp.json()
+        except Exception:
+            logger.exception(
+                "Failed proxy batch download proxy_url=%s hosts=%d "
+                "remote_path=%s base_dir=%s elapsed_seconds=%.3f",
+                self.proxy_url,
+                len(hosts),
+                body["remote_path"],
+                base_dir,
+                time.monotonic() - start,
             )
-        resp.raise_for_status()
-        return resp.json()
+            raise
+
+        logger.info(
+            "Completed proxy batch download proxy_url=%s hosts=%d "
+            "remote_path=%s succeeded=%s failed=%s elapsed_seconds=%.3f",
+            self.proxy_url,
+            len(hosts),
+            body["remote_path"],
+            response.get("succeeded"),
+            response.get("failed"),
+            time.monotonic() - start,
+        )
+        return response
 
     async def batch_download_stream(
         self,
@@ -89,25 +127,71 @@ class FTPBatchClient:
         max_workers: int = 4,
         on_progress: Callable[[dict[str, Any]], Any] | None = None,
     ) -> dict[str, Any]:
+        start = time.monotonic()
         body = self._build_body(hosts, remote_path, base_dir, max_workers)
         summary: dict[str, Any] = {}
-        async with self._http_session() as client:
-            async with client.stream(
-                "POST",
-                f"{self.proxy_url}/ftp-proxy/v1/batch-download/stream",
-                json=body,
-                timeout=httpx.Timeout(timeout=None),
-            ) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    # SSE는 event/data 줄 단위로 오므로 data 줄만 골라
-                    # 진행 상황과 최종 요약을 각각 해석한다.
-                    if line.startswith("data: "):
-                        data = json.loads(line[6:])
-                        if "host" in data and on_progress:
-                            callback_result = on_progress(data)
-                            if inspect.isawaitable(callback_result):
-                                await callback_result
-                        elif "total" in data:
-                            summary = data
+        progress_events = 0
+        logger.info(
+            "Starting proxy batch download stream proxy_url=%s hosts=%d "
+            "remote_path=%s base_dir=%s max_workers=%d",
+            self.proxy_url,
+            len(hosts),
+            body["remote_path"],
+            base_dir,
+            max_workers,
+        )
+        try:
+            async with self._http_session() as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.proxy_url}/ftp-proxy/v1/batch-download/stream",
+                    json=body,
+                    timeout=httpx.Timeout(timeout=None),
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        # SSE는 event/data 줄 단위로 오므로 data 줄만 골라
+                        # 진행 상황과 최종 요약을 각각 해석한다.
+                        if line.startswith("data: "):
+                            data = json.loads(line[6:])
+                            if "host" in data:
+                                progress_events += 1
+                                logger.info(
+                                    "Proxy batch download progress host=%s "
+                                    "status=%s local_path=%s error=%s",
+                                    data.get("host"),
+                                    data.get("status"),
+                                    data.get("local_path"),
+                                    data.get("error"),
+                                )
+                                if on_progress:
+                                    callback_result = on_progress(data)
+                                    if inspect.isawaitable(callback_result):
+                                        await callback_result
+                            elif "total" in data:
+                                summary = data
+        except Exception:
+            logger.exception(
+                "Failed proxy batch download stream proxy_url=%s hosts=%d "
+                "remote_path=%s base_dir=%s elapsed_seconds=%.3f",
+                self.proxy_url,
+                len(hosts),
+                body["remote_path"],
+                base_dir,
+                time.monotonic() - start,
+            )
+            raise
+
+        logger.info(
+            "Completed proxy batch download stream proxy_url=%s hosts=%d "
+            "remote_path=%s succeeded=%s failed=%s progress_events=%d "
+            "elapsed_seconds=%.3f",
+            self.proxy_url,
+            len(hosts),
+            body["remote_path"],
+            summary.get("succeeded"),
+            summary.get("failed"),
+            progress_events,
+            time.monotonic() - start,
+        )
         return summary

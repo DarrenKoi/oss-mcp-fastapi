@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from app.common.ftp_proxy.ftp_proxy_client import FTPProxyClient
@@ -110,13 +112,14 @@ async def test_list_files():
     assert entries[0]["name"] == "logs"
 
 
-async def test_download(tmp_path):
+async def test_download(tmp_path, caplog):
     http_client = FakeAsyncHTTPClient(stream_chunks=[b"fab-", b"data"])
     client = FTPProxyClient(
         "http://proxy.internal",
         "fab-tool",
         http_client=http_client,
     )
+    caplog.set_level(logging.INFO)
 
     downloaded = await client.download(
         "/recipes/report.csv",
@@ -139,9 +142,17 @@ async def test_download(tmp_path):
             },
         )
     ]
+    assert (
+        "Starting proxy download proxy_url=http://proxy.internal "
+        "target=fab-tool:21 remote_path=/recipes/report.csv"
+    ) in caplog.text
+    assert (
+        "Completed proxy download proxy_url=http://proxy.internal "
+        "target=fab-tool:21 remote_path=/recipes/report.csv"
+    ) in caplog.text
 
 
-async def test_upload(tmp_path):
+async def test_upload(tmp_path, caplog):
     upload_response = {"status": "uploaded", "remote_path": "/recipes/data.txt"}
     http_client = FakeAsyncHTTPClient(post_payload=upload_response)
 
@@ -153,6 +164,7 @@ async def test_upload(tmp_path):
         "fab-tool",
         http_client=http_client,
     )
+    caplog.set_level(logging.INFO)
     result = await client.upload(str(upload_file), "/recipes")
 
     assert result == upload_response
@@ -163,6 +175,14 @@ async def test_upload(tmp_path):
     )
     assert http_client.calls[0][2]["params"]["path"] == "/recipes"
     assert files["file"][0] == "data.txt"
+    assert (
+        "Starting proxy upload proxy_url=http://proxy.internal "
+        "target=fab-tool:21"
+    ) in caplog.text
+    assert (
+        "Completed proxy upload proxy_url=http://proxy.internal "
+        "target=fab-tool:21"
+    ) in caplog.text
 
 
 async def test_client_normalizes_windows_style_remote_paths(tmp_path):

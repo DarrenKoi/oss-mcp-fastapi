@@ -1,3 +1,5 @@
+import logging
+
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
 from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 from tests.ftp_fakes import FakeFTP, patch_connect
@@ -121,11 +123,12 @@ def test_direct_client_allows_encoding_override(monkeypatch):
 
 
 def test_proxy_server_upload_supports_base_and_stream_signatures(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, caplog
 ):
     fake_ftp = FakeFTP(directories={"/", "/recipes"})
     patch_connect(monkeypatch, FTPProxyServer, fake_ftp)
     server = FTPProxyServer("fab-tool")
+    caplog.set_level(logging.INFO)
 
     upload_source = tmp_path / "upload.txt"
     upload_source.write_bytes(b"new-data")
@@ -144,3 +147,11 @@ def test_proxy_server_upload_supports_base_and_stream_signatures(
         ("STOR upload.txt", b"new-data"),
         ("STOR stream.txt", b"new-data"),
     ]
+    assert (
+        "Starting FTP upload target=fab-tool:21 remote_dir=/recipes "
+        "filename=upload.txt file_size=8"
+    ) in caplog.text
+    assert (
+        "Completed FTP upload target=fab-tool:21 "
+        "remote_path=/recipes/stream.txt filename=stream.txt file_size=8"
+    ) in caplog.text

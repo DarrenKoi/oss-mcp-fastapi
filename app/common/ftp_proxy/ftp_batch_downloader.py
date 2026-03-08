@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Callable, Literal
 
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
+from app.common.ftp_proxy.ftp_logger import get_ftp_proxy_logger
 from app.common.ftp_proxy.ftp_path import normalize_remote_path, remote_basename
+
+logger = get_ftp_proxy_logger("server").getChild("batch_downloader")
 
 
 @dataclass
@@ -61,6 +64,17 @@ class FTPBatchDownloader:
     ) -> ToolDownloadResult:
         """워커 스레드 하나가 담당하는 단일 호스트 다운로드 작업."""
         start = time.monotonic()
+        normalized_remote_path = normalize_remote_path(remote_path)
+        local_dir = Path(base_dir) / host
+        filename = remote_basename(normalized_remote_path)
+        local_path = str(local_dir / filename)
+        logger.info(
+            "Starting FTP batch host download host=%s remote_path=%s "
+            "local_path=%s",
+            host,
+            normalized_remote_path,
+            local_path,
+        )
         try:
             client = FTPDirectClient(
                 host,
@@ -70,23 +84,37 @@ class FTPBatchDownloader:
                 timeout=self.timeout,
                 encoding=self.encoding,
             )
-            normalized_remote_path = normalize_remote_path(remote_path)
-            local_dir = Path(base_dir) / host
-            filename = remote_basename(normalized_remote_path)
-            local_path = str(local_dir / filename)
             client.download(normalized_remote_path, local_path)
+            elapsed_seconds = time.monotonic() - start
+            logger.info(
+                "Completed FTP batch host download host=%s remote_path=%s "
+                "local_path=%s elapsed_seconds=%.3f",
+                host,
+                normalized_remote_path,
+                local_path,
+                elapsed_seconds,
+            )
             return ToolDownloadResult(
                 host=host,
                 status="success",
                 local_path=local_path,
-                elapsed_seconds=time.monotonic() - start,
+                elapsed_seconds=elapsed_seconds,
             )
         except Exception as exc:
+            elapsed_seconds = time.monotonic() - start
+            logger.exception(
+                "Failed FTP batch host download host=%s remote_path=%s "
+                "local_path=%s elapsed_seconds=%.3f",
+                host,
+                normalized_remote_path,
+                local_path,
+                elapsed_seconds,
+            )
             return ToolDownloadResult(
                 host=host,
                 status="failed",
                 error=str(exc),
-                elapsed_seconds=time.monotonic() - start,
+                elapsed_seconds=elapsed_seconds,
             )
 
     def batch_download(
@@ -101,13 +129,22 @@ class FTPBatchDownloader:
         effective_workers = min(max(max_workers, 1), self.MAX_WORKERS_CAP)
         result = BatchDownloadResult(total=len(hosts))
         start = time.monotonic()
+        normalized_remote_path = normalize_remote_path(remote_path)
+        logger.info(
+            "Starting FTP batch download hosts=%d remote_path=%s base_dir=%s "
+            "max_workers=%d",
+            len(hosts),
+            normalized_remote_path,
+            base_dir,
+            effective_workers,
+        )
 
         with ThreadPoolExecutor(max_workers=effective_workers) as executor:
             # 완료 순서대로 결과를 수집해서, 느린 호스트가 있어도
             # 먼저 끝난 작업의 상태를 바로 상위 호출자에 전달할 수 있다.
             futures = {
                 executor.submit(
-                    self._download_one, host, remote_path, base_dir
+                    self._download_one, host, normalized_remote_path, base_dir
                 ): host
                 for host in hosts
             }
@@ -122,4 +159,13 @@ class FTPBatchDownloader:
                     on_complete(tool_result)
 
         result.elapsed_seconds = time.monotonic() - start
+        logger.info(
+            "Completed FTP batch download hosts=%d remote_path=%s succeeded=%d "
+            "failed=%d elapsed_seconds=%.3f",
+            len(hosts),
+            normalized_remote_path,
+            result.succeeded,
+            result.failed,
+            result.elapsed_seconds,
+        )
         return result

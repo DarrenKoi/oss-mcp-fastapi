@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 import httpx
 
@@ -97,7 +99,6 @@ async def test_batch_download_stream_reports_progress_and_returns_summary():
         ]
     )
     client = FTPBatchClient("http://proxy.internal", http_client=http_client)
-
     summary = await client.batch_download_stream(
         ["fab-1", "fab-2"],
         "/recipes/report.csv",
@@ -129,6 +130,62 @@ async def test_batch_download_stream_reports_progress_and_returns_summary():
     assert timeout.read is None
     assert timeout.write is None
     assert timeout.pool is None
+
+
+async def test_batch_download_stream_logs_progress_and_summary(caplog):
+    progress_events: list[dict] = []
+    http_client = FakeAsyncHTTPClient(
+        stream_lines=[
+            'data: {"host": "fab-1", "status": "success"}',
+            'data: {"host": "fab-2", "status": "failed", "error": "timeout"}',
+            'data: {"total": 2, "succeeded": 1, "failed": 1}',
+        ]
+    )
+    client = FTPBatchClient("http://proxy.internal", http_client=http_client)
+    caplog.set_level(logging.INFO)
+
+    summary = await client.batch_download_stream(
+        ["fab-1", "fab-2"],
+        "/recipes/report.csv",
+        "/tmp/downloads",
+        on_progress=progress_events.append,
+    )
+
+    assert progress_events == [
+        {"host": "fab-1", "status": "success"},
+        {"host": "fab-2", "status": "failed", "error": "timeout"},
+    ]
+    assert summary == {"total": 2, "succeeded": 1, "failed": 1}
+    assert http_client.calls[0][:2] == (
+        "stream",
+        ("POST", "http://proxy.internal/ftp-proxy/v1/batch-download/stream"),
+    )
+    assert http_client.calls[0][2]["json"] == {
+        "hosts": ["fab-1", "fab-2"],
+        "remote_path": "/recipes/report.csv",
+        "base_dir": "/tmp/downloads",
+        "port": 21,
+        "user": "anonymous",
+        "password": "",
+        "max_workers": 4,
+    }
+    timeout = http_client.calls[0][2]["timeout"]
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect is None
+    assert timeout.read is None
+    assert timeout.write is None
+    assert timeout.pool is None
+    assert (
+        "Starting proxy batch download stream proxy_url=http://proxy.internal "
+        "hosts=2 remote_path=/recipes/report.csv"
+    ) in caplog.text
+    assert "Proxy batch download progress host=fab-1 status=success" in caplog.text
+    assert "Proxy batch download progress host=fab-2 status=failed" in caplog.text
+    assert (
+        "Completed proxy batch download stream proxy_url=http://proxy.internal "
+        "hosts=2 remote_path=/recipes/report.csv succeeded=1 failed=1 "
+        "progress_events=2"
+    ) in caplog.text
 
 
 async def test_batch_download_stream_awaits_async_progress_callback():
