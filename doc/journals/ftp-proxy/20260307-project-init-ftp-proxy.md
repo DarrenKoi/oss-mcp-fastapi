@@ -20,7 +20,7 @@
 - `app/common/ftp_proxy/__init__.py`
 - `app/common/ftp_proxy/ftp_client.py` — `ftplib` 기반 FTP 연결 컨텍스트 매니저, `list_dir()`, `download_stream()`, `upload_file()` 함수
 - `app/common/ftp_proxy/router.py` — 3개 API 엔드포인트 (`/v1/ftp-proxy/list`, `/v1/ftp-proxy/download`, `/v1/ftp-proxy/upload`)
-- `doc/journals/ftp_proxy.md` — FTP Proxy 모듈 개발 기록
+- `doc/journals/ftp-proxy/README.md` — FTP Proxy 저널 인덱스 및 현재 기준 안내
 
 ### 수정된 파일
 - `app/main.py` — `include_router`에 `prefix="/v1"` 추가
