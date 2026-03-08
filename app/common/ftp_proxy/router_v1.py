@@ -18,8 +18,7 @@ def ftp_list(
 ):
     try:
         server = FTPProxyServer(host, port, user, password)
-        entries = server.list_dir(path)
-        return {"path": path, "entries": entries}
+        return server.list_dir_response(path)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
 
