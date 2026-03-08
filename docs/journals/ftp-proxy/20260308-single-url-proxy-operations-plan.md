@@ -12,7 +12,7 @@
 
 ## 2. 수정 내용
 
-- `doc/journals/ftp-proxy/20260308-single-url-proxy-operations-plan.md` 신규 작성
+- `docs/journals/ftp-proxy/20260308-single-url-proxy-operations-plan.md` 신규 작성
 - 코드 수정 없음
 - 이번 문서는 구현 기록이 아니라 운영/아키텍처 계획 정리 목적의 저널임
 

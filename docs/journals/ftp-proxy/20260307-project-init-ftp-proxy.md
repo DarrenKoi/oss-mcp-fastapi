@@ -7,7 +7,7 @@
 - FastAPI 프로젝트 스캐폴딩 구성
 - FTP Proxy 모듈 구현 (`app/common/ftp_proxy/`)
 - API 라우터에 `/v1` 버전 프리픽스 적용
-- `doc/journals/` 디렉토리 생성 및 FTP Proxy 개발 저널 작성
+- `docs/journals/` 디렉토리 생성 및 FTP Proxy 개발 저널 작성
 
 ## 2. 수정 내용
 
@@ -20,7 +20,7 @@
 - `app/common/ftp_proxy/__init__.py`
 - `app/common/ftp_proxy/ftp_client.py` — `ftplib` 기반 FTP 연결 컨텍스트 매니저, `list_dir()`, `download_stream()`, `upload_file()` 함수
 - `app/common/ftp_proxy/router.py` — 3개 API 엔드포인트 (`/v1/ftp-proxy/list`, `/v1/ftp-proxy/download`, `/v1/ftp-proxy/upload`)
-- `doc/journals/ftp-proxy/README.md` — FTP Proxy 저널 인덱스 및 현재 기준 안내
+- `docs/journals/ftp-proxy/README.md` — FTP Proxy 저널 인덱스 및 현재 기준 안내
 
 ### 수정된 파일
 - `app/main.py` — `include_router`에 `prefix="/v1"` 추가

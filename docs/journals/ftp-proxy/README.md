@@ -35,5 +35,5 @@
 
 ## 정리 규칙
 
-- FTP Proxy 관련 세션 저널은 앞으로 `doc/journals/ftp-proxy/` 아래에 저장한다.
-- 여러 도메인에 걸친 문서는 루트 `doc/journals/`에 유지한다.
+- FTP Proxy 관련 세션 저널은 앞으로 `docs/journals/ftp-proxy/` 아래에 저장한다.
+- 여러 도메인에 걸친 문서는 루트 `docs/journals/`에 유지한다.

@@ -41,7 +41,7 @@ API versioning uses suffix-style paths owned directly by each versioned router m
 
 ## Journals
 
-Development journals are kept in `doc/journals/` in Korean. Use the `/journal` skill to generate session journals.
+Development journals are kept in `docs/journals/` in Korean. Use the `/journal` skill to generate session journals.
 
 ## Commit Automation Policy
 

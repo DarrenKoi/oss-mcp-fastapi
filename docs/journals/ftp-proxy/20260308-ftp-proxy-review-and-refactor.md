@@ -56,7 +56,7 @@
 - `tests/test_ftp_proxy_listing_home.py` — 기존 테스트 리팩토링 + 신규 2건 추가
 
 ### 저널 생성
-- `doc/journals/ftp-proxy/20260308-ftp-proxy-robustness-fixes.md` — 첫 번째 수정 내역 저널
+- `docs/journals/ftp-proxy/20260308-ftp-proxy-robustness-fixes.md` — 첫 번째 수정 내역 저널
 
 ## 3. 다음 단계
 
