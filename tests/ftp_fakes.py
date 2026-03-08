@@ -167,6 +167,16 @@ def patch_connect(monkeypatch, cls, fake_ftp: FakeFTP) -> None:
     monkeypatch.setattr(cls, "_connect", fake_connect)
 
 
+def patch_connect_multi(
+    monkeypatch, cls, fakes_by_host: dict[str, FakeFTP]
+) -> None:
+    @contextmanager
+    def fake_connect(self):
+        yield fakes_by_host[self.host]
+
+    monkeypatch.setattr(cls, "_connect", fake_connect)
+
+
 def async_patch_connect(monkeypatch, cls, fake_ftp: FakeFTP) -> None:
     @contextmanager
     def fake_connect(self):
