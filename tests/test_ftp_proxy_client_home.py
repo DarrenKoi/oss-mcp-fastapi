@@ -1,15 +1,87 @@
+import pytest
+
 from app.common.ftp_proxy.ftp_proxy_client import FTPProxyClient
 
 
+pytestmark = [pytest.mark.unit, pytest.mark.home]
+
+
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload=None, *, chunks=None):
         self.payload = payload
+        self.chunks = list(chunks or [])
 
     def raise_for_status(self) -> None:
         return None
 
     def json(self):
         return self.payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def iter_bytes(self, chunk_size=8192):
+        yield from self.chunks
+
+
+class FakeHTTPClient:
+    def __init__(
+        self,
+        *,
+        get_payload=None,
+        post_payload=None,
+        stream_chunks=None,
+    ):
+        self.get_payload = get_payload
+        self.post_payload = post_payload
+        self.stream_chunks = list(stream_chunks or [])
+        self.calls: list[tuple[str, tuple, dict]] = []
+
+    def get(self, url, **kwargs):
+        self.calls.append(("get", (url,), kwargs))
+        return FakeResponse(self.get_payload)
+
+    def post(self, url, **kwargs):
+        self.calls.append(("post", (url,), kwargs))
+        return FakeResponse(self.post_payload)
+
+    def stream(self, method, url, **kwargs):
+        self.calls.append(("stream", (method, url), kwargs))
+        return FakeResponse(chunks=self.stream_chunks)
+
+
+def test_download_writes_streamed_bytes(tmp_path):
+    http_client = FakeHTTPClient(stream_chunks=[b"fab-", b"data"])
+    client = FTPProxyClient(
+        "http://proxy.internal",
+        "fab-tool",
+        http_client=http_client,
+    )
+
+    downloaded = client.download(
+        "/recipes/report.csv",
+        str(tmp_path / "downloads" / "report.csv"),
+    )
+
+    assert downloaded.read_bytes() == b"fab-data"
+    assert http_client.calls == [
+        (
+            "stream",
+            ("GET", "http://proxy.internal/ftp-proxy/v1/download"),
+            {
+                "params": {
+                    "host": "fab-tool",
+                    "port": 21,
+                    "user": "anonymous",
+                    "password": "",
+                    "path": "/recipes/report.csv",
+                }
+            },
+        )
+    ]
 
 
 def test_list_files_handles_server_metadata_response(monkeypatch):
@@ -28,7 +100,10 @@ def test_list_files_handles_server_metadata_response(monkeypatch):
         assert params["path"] == "/recipes"
         return FakeResponse(payload)
 
-    monkeypatch.setattr("app.common.ftp_proxy.ftp_proxy_client.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "app.common.ftp_proxy.ftp_proxy_client.httpx.Client.get",
+        lambda self, url, **kwargs: fake_get(url, kwargs["params"]),
+    )
 
     client = FTPProxyClient("http://proxy.internal", "fab-tool")
     response = client.list_files_response("/recipes")
@@ -48,7 +123,10 @@ def test_list_files_normalizes_legacy_list_payload(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr("app.common.ftp_proxy.ftp_proxy_client.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "app.common.ftp_proxy.ftp_proxy_client.httpx.Client.get",
+        lambda self, url, **kwargs: fake_get(url, kwargs["params"]),
+    )
 
     client = FTPProxyClient("http://proxy.internal", "fab-tool")
     entries = client.list_files("/recipes")
@@ -73,7 +151,10 @@ def test_list_files_normalizes_nested_payload_keys(monkeypatch):
     def fake_get(url, params):
         return FakeResponse(payload)
 
-    monkeypatch.setattr("app.common.ftp_proxy.ftp_proxy_client.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "app.common.ftp_proxy.ftp_proxy_client.httpx.Client.get",
+        lambda self, url, **kwargs: fake_get(url, kwargs["params"]),
+    )
 
     client = FTPProxyClient("http://proxy.internal", "fab-tool")
     response = client.list_files_response("/recipes")
@@ -91,7 +172,10 @@ def test_proxy_client_sends_optional_timeout_and_encoding(monkeypatch):
         captured.update(params)
         return FakeResponse({"entries": []})
 
-    monkeypatch.setattr("app.common.ftp_proxy.ftp_proxy_client.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "app.common.ftp_proxy.ftp_proxy_client.httpx.Client.get",
+        lambda self, url, **kwargs: fake_get(url, kwargs["params"]),
+    )
 
     client = FTPProxyClient(
         "http://proxy.internal",

@@ -8,8 +8,23 @@ from app.common.ftp_proxy.ftp_proxy_server import FTPProxyServer
 router = APIRouter(prefix="/ftp-proxy/v1", tags=["FTP Proxy"])
 
 
+async def _prime_stream(stream):
+    first_chunk = await anext(stream, None)
+
+    async def body():
+        try:
+            if first_chunk is not None:
+                yield first_chunk
+            async for chunk in stream:
+                yield chunk
+        finally:
+            await stream.aclose()
+
+    return body()
+
+
 @router.get("/list")
-def ftp_list(
+async def ftp_list(
     host: str = Query(...),
     port: int = Query(21),
     user: str = Query("anonymous"),
@@ -27,13 +42,13 @@ def ftp_list(
             timeout=timeout,
             encoding=encoding,
         )
-        return server.list_dir_response(path)
+        return await server.alist_dir_response(path)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")
 
 
 @router.get("/download")
-def ftp_download(
+async def ftp_download(
     host: str = Query(...),
     port: int = Query(21),
     user: str = Query("anonymous"),
@@ -42,25 +57,29 @@ def ftp_download(
     encoding: str | None = Query(None),
     path: str = Query(...),
 ):
-    filename = os.path.basename(path)
-    server = FTPProxyServer(
-        host,
-        port,
-        user,
-        password,
-        timeout=timeout,
-        encoding=encoding,
-    )
+    filename = os.path.basename(path.rstrip("/")) or "download"
 
-    return StreamingResponse(
-        server.download_stream(path),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    try:
+        server = FTPProxyServer(
+            host,
+            port,
+            user,
+            password,
+            timeout=timeout,
+            encoding=encoding,
+        )
+        stream = await _prime_stream(server.adownload_stream(path))
+        return StreamingResponse(
+            stream,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"FTP error: {e}")
 
 
 @router.post("/upload")
-def ftp_upload(
+async def ftp_upload(
     host: str = Query(...),
     port: int = Query(21),
     user: str = Query("anonymous"),
@@ -79,7 +98,7 @@ def ftp_upload(
             timeout=timeout,
             encoding=encoding,
         )
-        remote_path = server.upload(path, file.filename, file.file)
+        remote_path = await server.aupload(path, file.filename, file.file)
         return {"status": "uploaded", "remote_path": remote_path}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"FTP error: {e}")

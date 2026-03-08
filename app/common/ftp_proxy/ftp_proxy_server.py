@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, BinaryIO, overload
 
 from app.common.ftp_proxy.ftp_direct_client import FTPDirectClient
@@ -28,3 +29,16 @@ class FTPProxyServer(FTPDirectClient):
         if file is None:
             return super().upload(arg1, arg2)
         return self._upload_fileobj(arg1, arg2, file)
+
+    async def alist_dir(self, path: str = "/") -> list[dict[str, Any]]:
+        return await self.alist_files(path)
+
+    async def alist_dir_response(self, path: str = "/") -> dict[str, Any]:
+        return await self.alist_files_response(path)
+
+    async def aupload(
+        self, arg1: str, arg2: str, file: BinaryIO | None = None
+    ) -> dict[str, str] | str:
+        if file is None:
+            return await super().aupload(arg1, arg2)
+        return await asyncio.to_thread(self._upload_fileobj, arg1, arg2, file)

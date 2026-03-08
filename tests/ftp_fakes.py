@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from ftplib import error_perm
 
 
@@ -165,3 +165,16 @@ def patch_connect(monkeypatch, cls, fake_ftp: FakeFTP) -> None:
         yield fake_ftp
 
     monkeypatch.setattr(cls, "_connect", fake_connect)
+
+
+def async_patch_connect(monkeypatch, cls, fake_ftp: FakeFTP) -> None:
+    @contextmanager
+    def fake_connect(self):
+        yield fake_ftp
+
+    @asynccontextmanager
+    async def fake_aconnect(self):
+        yield fake_ftp
+
+    monkeypatch.setattr(cls, "_connect", fake_connect)
+    monkeypatch.setattr(cls, "_aconnect", fake_aconnect)

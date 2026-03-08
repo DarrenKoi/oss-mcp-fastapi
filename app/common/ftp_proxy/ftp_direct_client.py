@@ -1,10 +1,11 @@
+import asyncio
 import posixpath
 import re
-from contextlib import contextmanager, suppress
+from contextlib import asynccontextmanager, contextmanager, suppress
 from datetime import datetime
 from ftplib import FTP, all_errors
 from pathlib import Path
-from typing import Any, BinaryIO, Generator
+from typing import Any, AsyncGenerator, BinaryIO, Generator
 
 
 class FTPDirectClient:
@@ -48,18 +49,31 @@ class FTPDirectClient:
         self.timeout = timeout
         self.encoding = encoding
 
-    @contextmanager
-    def _connect(self) -> Generator[FTP, None, None]:
+    def _create_and_login_ftp(self) -> FTP:
         ftp = FTP(timeout=self.timeout)
         if self.encoding:
             ftp.encoding = self.encoding
         ftp.connect(self.host, self.port, timeout=self.timeout)
         ftp.login(self.user, self.password)
+        return ftp
+
+    @contextmanager
+    def _connect(self) -> Generator[FTP, None, None]:
+        ftp = self._create_and_login_ftp()
         try:
             yield ftp
         finally:
             with suppress(all_errors):
                 ftp.quit()
+
+    @asynccontextmanager
+    async def _aconnect(self) -> AsyncGenerator[FTP, None]:
+        ftp = await asyncio.to_thread(self._create_and_login_ftp)
+        try:
+            yield ftp
+        finally:
+            with suppress(all_errors):
+                await asyncio.to_thread(ftp.quit)
 
     def list_files(self, path: str = "/") -> list[dict[str, Any]]:
         return self.list_files_response(path)["entries"]
@@ -492,3 +506,27 @@ class FTPDirectClient:
                 remote_dir, local.name, file_obj
             )
         return {"status": "uploaded", "remote_path": remote_path}
+
+    async def alist_files(self, path: str = "/") -> list[dict[str, Any]]:
+        return (await self.alist_files_response(path))["entries"]
+
+    async def alist_files_response(self, path: str = "/") -> dict[str, Any]:
+        return await asyncio.to_thread(self.list_files_response, path)
+
+    async def adownload_stream(self, path: str) -> AsyncGenerator[bytes, None]:
+        gen = self.download_stream(path)
+        sentinel = object()
+        try:
+            while True:
+                chunk = await asyncio.to_thread(next, gen, sentinel)
+                if chunk is sentinel:
+                    break
+                yield chunk
+        finally:
+            await asyncio.to_thread(gen.close)
+
+    async def adownload(self, remote_path: str, local_path: str) -> Path:
+        return await asyncio.to_thread(self.download, remote_path, local_path)
+
+    async def aupload(self, local_path: str, remote_dir: str) -> dict[str, str]:
+        return await asyncio.to_thread(self.upload, local_path, remote_dir)
