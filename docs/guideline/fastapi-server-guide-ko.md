@@ -315,6 +315,9 @@ data: {"total":2,"succeeded":1,"failed":1,"elapsed_seconds":1.42}
 `FTPProxyClient`는 비동기 HTTP 클라이언트입니다.  
 즉, `await`로 호출해야 합니다.
 
+`proxy_url`을 생략하면 `FTP_PROXY_URL` 환경 변수를 먼저 보고,
+없으면 로컬 기본값 `http://127.0.0.1:8000`을 사용합니다.
+
 ```python
 import asyncio
 
@@ -349,6 +352,9 @@ asyncio.run(main())
 - `await client.upload(local_path, remote_dir)`
 
 ### 2. 다중 호스트 작업: `FTPBatchClient`
+
+`FTPBatchClient`도 `proxy_url`을 생략하면 같은 `FTP_PROXY_URL`
+환경 변수를 사용합니다.
 
 ```python
 import asyncio

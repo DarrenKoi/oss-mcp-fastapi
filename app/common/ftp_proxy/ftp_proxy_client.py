@@ -1,4 +1,3 @@
-import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,14 +8,9 @@ import httpx
 from app.common.ftp_proxy.ftp_client_base import FTPListResponseNormalizer
 from app.common.ftp_proxy.ftp_logger import get_ftp_proxy_logger
 from app.common.ftp_proxy.ftp_path import normalize_remote_path
+from app.common.ftp_proxy.proxy_url import default_proxy_url
 
 logger = get_ftp_proxy_logger("client").getChild("proxy_client")
-
-DEFAULT_PROXY_URL = "http://127.0.0.1:8000"
-
-
-def _default_proxy_url() -> str:
-    return os.getenv("FTP_PROXY_URL", DEFAULT_PROXY_URL).rstrip("/")
 
 
 class _FTPProxyClientBase(FTPListResponseNormalizer):
@@ -34,7 +28,7 @@ class _FTPProxyClientBase(FTPListResponseNormalizer):
         ftp_encoding: str | None = None,
     ):
         self.proxy_url = (
-            proxy_url.rstrip("/") if proxy_url else _default_proxy_url()
+            proxy_url.rstrip("/") if proxy_url else default_proxy_url()
         )
         self.ftp_host = ftp_host
         self.ftp_port = ftp_port

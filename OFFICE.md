@@ -10,6 +10,7 @@ Use this file to remember non-sensitive office testing constraints for this repo
 - Office testing happens on Windows.
 - Office Python version is 3.11.
 - Office testing may use Redis, MongoDB, and OpenSearch.
+- Office cloud uses separate DEV/STG/PRD API base URLs; choose one via environment variables and do not commit hostnames.
 - Production runs on Linux.
 - Integration tests must avoid hardcoded secrets or hostnames in source control.
 

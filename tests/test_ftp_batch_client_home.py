@@ -227,3 +227,23 @@ async def test_batch_client_normalizes_windows_style_remote_paths():
     assert http_client.calls[0][2]["json"]["remote_path"] == (
         "C:/recipes/report.csv"
     )
+
+
+async def test_batch_client_uses_env_default_proxy_url(monkeypatch):
+    payload = {"total": 1, "succeeded": 1, "failed": 0}
+    http_client = FakeAsyncHTTPClient(post_payload=payload)
+    monkeypatch.setenv("FTP_PROXY_URL", "https://proxy.from.env/")
+    client = FTPBatchClient(http_client=http_client)
+
+    response = await client.batch_download(
+        ["fab-1"],
+        "/recipes/report.csv",
+        "/tmp/downloads",
+    )
+
+    assert response == payload
+    assert client.proxy_url == "https://proxy.from.env"
+    assert http_client.calls[0][:2] == (
+        "post",
+        ("https://proxy.from.env/ftp-proxy/v1/batch-download",),
+    )

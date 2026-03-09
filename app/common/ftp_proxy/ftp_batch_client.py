@@ -10,6 +10,7 @@ import httpx
 
 from app.common.ftp_proxy.ftp_logger import get_ftp_proxy_logger
 from app.common.ftp_proxy.ftp_path import normalize_remote_path
+from app.common.ftp_proxy.proxy_url import default_proxy_url
 
 logger = get_ftp_proxy_logger("client").getChild("batch_client")
 
@@ -19,7 +20,7 @@ class FTPBatchClient:
 
     def __init__(
         self,
-        proxy_url: str,
+        proxy_url: str | None = None,
         *,
         port: int = 21,
         user: str = "anonymous",
@@ -28,7 +29,7 @@ class FTPBatchClient:
         encoding: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ):
-        self.proxy_url = proxy_url.rstrip("/")
+        self.proxy_url = proxy_url.rstrip("/") if proxy_url else default_proxy_url()
         self.port = port
         self.user = user
         self.password = password
