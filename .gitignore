@@ -13,3 +13,7 @@ build/
 .vscode/
 *.swp
 *.swo
+.pytest_cache/
+pytest.ini
+test/
+tests/
