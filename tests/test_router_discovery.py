@@ -23,6 +23,7 @@ def test_discover_routers_loads_versioned_router_modules() -> None:
         "/oss/dec/v1",
         "/oss/mtc/v1",
         "/oss/v1",
+        "/skewnono/member_info/v1",
         "/skewnono/v1",
     }
 
