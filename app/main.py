@@ -1,13 +1,15 @@
 # collections.abc의 Iterable, Sequence는 "이 값이 어떤 식으로 다뤄지는지"를 설명하는 타입 힌트다.
 # - Iterable[str]: for 문으로 순회할 수 있는 문자열 묶음이면 된다. (예: list, tuple, generator)
 # - Sequence[str]: 순서가 있는 문자열 목록이다. (예: list, tuple)
-from collections.abc import Iterable, Sequence
+from collections.abc import AsyncGenerator, Iterable, Sequence
+from contextlib import asynccontextmanager
 from importlib import import_module
 from pkgutil import walk_packages
 
 from fastapi import APIRouter, FastAPI
 
 import app as app_package
+from app.common.scheduler.scheduler_core import scheduler_lifespan
 
 
 # 자동 규칙으로 찾을 수 없는 라우터 모듈이 있으면 여기에 dotted path를 수동 등록한다.
@@ -84,9 +86,15 @@ def discover_routers(
     return routers
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    async with scheduler_lifespan(app):
+        yield
+
+
 # 앱 시작 시점에 FastAPI 인스턴스를 만들고,
 # 자동 탐색된 모든 라우터를 즉시 등록한다.
-app = FastAPI(title="Internal MCP FastAPI Server")
+app = FastAPI(title="Internal MCP FastAPI Server", lifespan=lifespan)
 
 for router in discover_routers():
     app.include_router(router)
