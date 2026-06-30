@@ -7,9 +7,21 @@ from importlib import import_module
 from pkgutil import walk_packages
 
 from fastapi import APIRouter, FastAPI
+from fastapi_mcp import FastApiMCP
 
 import app as app_package
 from app.common.scheduler.scheduler_core import scheduler_lifespan
+
+# MCP 도구로 노출할 엔드포인트의 operation_id 목록. 여기 적힌 것만 /mcp 에서 도구로 보인다.
+# 태그가 아니라 operation_id 로 고르는 이유: 라우터 단위 태그를 쓰면 같은 라우터의 /health
+# 같은 잡다한 엔드포인트까지 도구가 돼 버려 LLM 컨텍스트만 잡아먹는다. MCP 용으로 다듬은
+# (operation_id·description 이 또렷한) 엔드포인트만 골라 넣는다. 새 도구를 추가하려면 그
+# 엔드포인트에 명시적 operation_id 를 달고 여기에 한 줄 더한다.
+MCP_INCLUDE_OPERATIONS: tuple[str, ...] = (
+    "member_info_search",
+    "member_info_filter",
+    "member_info_lookup",
+)
 
 
 # 자동 규칙으로 찾을 수 없는 라우터 모듈이 있으면 여기에 dotted path를 수동 등록한다.
@@ -104,3 +116,14 @@ for router in discover_routers():
 def health():
     # 서버 기동 여부를 빠르게 확인하는 기본 헬스 체크 엔드포인트다.
     return {"status": "ok"}
+
+
+# 라우터를 모두 include한 뒤에 MCP 서버를 만든다. FastApiMCP는 앱의 OpenAPI 스키마를 읽어
+# 도구 목록을 만들기 때문에, 라우터 등록 전에 만들면 도구가 하나도 안 잡힌다.
+# MCP_INCLUDE_OPERATIONS에 해당하는 엔드포인트만 골라 노출하고, /mcp 경로에 HTTP 트랜스포트로 붙인다.
+mcp = FastApiMCP(
+    app,
+    name="Internal MCP FastAPI Server",
+    include_operations=list(MCP_INCLUDE_OPERATIONS),
+)
+mcp.mount_http()
